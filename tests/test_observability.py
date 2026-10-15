@@ -63,7 +63,7 @@ def test_log_extra_fields_outside_allowlist_are_dropped(
     captured: tuple[logging.Logger, io.StringIO],
 ) -> None:
     logger, stream = captured
-    secret = "BSB 062-000 acct 99887766"
+    secret = "BSB 000-100 acct 99887766"
 
     logger.info(
         "decision made",

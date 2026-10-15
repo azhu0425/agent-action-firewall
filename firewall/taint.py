@@ -17,7 +17,7 @@ from firewall.models import ArgumentValue, Message, Source, ToolCall
 # Fail closed: every source except the user is a taint source, including the assistant.
 _UNTRUSTED = frozenset(Source) - {Source.USER}
 
-# Everything except these is formatting: "062–000", "1234​5678", "$9,800", "a.b@c.com".
+# Everything except these is formatting: "000–100", "1234​5678", "$9,800", "a.b@c.com".
 _SEPARATORS = re.compile(r"[^a-z0-9@]+")
 
 
@@ -40,8 +40,8 @@ def _argument_text(value: ArgumentValue) -> str:
 def _typed_by_user(needle: str, user_texts: Sequence[str]) -> bool:
     """True when the user typed `needle` as a whole token, allowing separators inside it.
 
-    User text keeps one space per separator run, so "062 000 1234-5678" still clears
-    "06200012345678" but "9912345678" does not clear an injected "12345678".
+    User text keeps one space per separator run, so "000 100 1234-5678" still clears
+    "00010012345678" but "9912345678" does not clear an injected "12345678".
     """
     pattern = re.compile(r"(?<![a-z0-9@])" + " ?".join(map(re.escape, needle)) + r"(?![a-z0-9@])")
     return any(pattern.search(text) for text in user_texts)
