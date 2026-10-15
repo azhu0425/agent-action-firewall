@@ -18,9 +18,49 @@ $450 injected transfer, under every cap, is denied rather than parked for approv
 
 ## Run it end to end
 
-Takes about 5 minutes. Needs **Python 3.12** and **git**; [uv](https://docs.astral.sh/uv/) is
-optional. No API keys, no network calls, no Docker. Commands are shown for macOS/Linux (bash) and
-Windows (PowerShell); where only one form is given it works in both.
+Two ways in. **Option A needs only Docker**, so it behaves the same on any machine. Option B runs
+on a local Python 3.12. No API keys, no network calls from the app.
+
+### Option A: Docker (recommended)
+
+Needs [Docker Desktop](https://www.docker.com/products/docker-desktop/) (Windows/macOS) or Docker
+Engine with the Compose plugin (Linux), and git. The commands are identical in bash and PowerShell,
+except that PowerShell users type `curl.exe` instead of `curl`.
+
+```bash
+git clone https://github.com/azhu0425/agent-action-firewall.git
+cd agent-action-firewall
+
+docker compose up --build -d                 # 1. build and start the API on :8000
+docker compose run --rm verify               # 2. full strict check suite (what CI runs): RESULT: PASS
+docker compose run --rm demo                 # 3. injected $9,800: moves without the firewall, DENY with it
+
+curl -s localhost:8000/health                # 4. {"status":"ok",...}
+curl -s -X POST localhost:8000/v1/evaluate -H "Content-Type: application/json" --data-binary "@examples/benign-known-payee.json"        # ALLOW
+curl -s -X POST localhost:8000/v1/evaluate -H "Content-Type: application/json" --data-binary "@examples/new-payee-needs-approval.json"  # REQUIRE_HUMAN_APPROVAL
+curl -s -X POST localhost:8000/v1/evaluate -H "Content-Type: application/json" --data-binary "@examples/headline-attack.json"           # DENY
+
+docker compose run --rm verify-audit         # 5. OK 3 records, head <hash>
+docker compose logs firewall                 #    one JSON "decision" line per request, no values
+docker compose run --rm replay               # 6. 20/20 traces met expectations
+```
+
+**Fail closed** (7): restart against a policy file that does not exist, then repeat step 4.
+`/health` returns `503 {"status":"degraded","reason":"policy_unloaded"}`, every request (even the
+benign one) is `DENY POLICY_UNLOADED`, and `docker compose ps` shows the container `unhealthy`.
+
+```bash
+FIREWALL_POLICY_PATH=/app/policy/missing.yaml docker compose up -d --force-recreate firewall
+# PowerShell: $env:FIREWALL_POLICY_PATH="/app/policy/missing.yaml"; docker compose up -d --force-recreate firewall
+# restore:    unset FIREWALL_POLICY_PATH (PowerShell: Remove-Item Env:FIREWALL_POLICY_PATH); docker compose up -d --force-recreate firewall
+```
+
+Clean up with `docker compose down -v`. Interactive API docs: <http://localhost:8000/docs>.
+
+### Option B: local Python
+
+Needs Python 3.12 and git ([uv](https://docs.astral.sh/uv/) optional). Commands are shown for
+bash, with the PowerShell form in comments.
 
 **1. Clone**
 
@@ -117,8 +157,7 @@ python eval/run_eval.py --mutation                        # expect: MUTATION: PA
 Configuration is environment variables only, documented in `.env.example`. No secrets are needed.
 Run **one uvicorn worker per audit log**: the hash chain assumes a single writer, and a
 cross-process lock is not built (`evidence/operate.md`). A container image is also provided
-(`docker build -t firewall . && docker run -p 8000:8000 firewall`); it is built and smoke-tested
-in CI.
+(Option A); CI runs the whole Option A walkthrough on every pull request.
 
 ## Verify
 

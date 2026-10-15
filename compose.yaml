@@ -1,0 +1,44 @@
+# docker compose up --build -d         -> API on http://localhost:8000 (docs at /docs)
+# docker compose run --rm firewall python -m firewall.cli demo
+# docker compose run --rm verify        -> full strict check suite, exactly what CI runs
+services:
+  firewall:
+    build:
+      context: .
+      target: runtime
+    image: agent-action-firewall:local
+    ports:
+      - "8000:8000"
+    environment:
+      # Override to see fail-closed degraded mode, e.g. FIREWALL_POLICY_PATH=/app/policy/missing.yaml
+      FIREWALL_POLICY_PATH: ${FIREWALL_POLICY_PATH:-/app/policy/policy.yaml}
+    volumes:
+      - audit:/app/audit
+
+  # One-shot tools (profile "tools"): docker compose run --rm <name>
+  demo:
+    image: agent-action-firewall:local
+    command: ["python", "-m", "firewall.cli", "demo"]
+    profiles: ["tools"]
+
+  replay:
+    image: agent-action-firewall:local
+    command: ["python", "-m", "firewall.cli", "replay", "/app/eval/corpus/attack.jsonl"]
+    profiles: ["tools"]
+
+  verify-audit:
+    image: agent-action-firewall:local
+    command: ["python", "-m", "firewall.cli", "verify-audit", "/app/audit/audit.jsonl"]
+    volumes:
+      - audit:/app/audit
+    profiles: ["tools"]
+
+  verify:
+    build:
+      context: .
+      target: verify
+    image: agent-action-firewall:verify
+    profiles: ["tools"]
+
+volumes:
+  audit:
