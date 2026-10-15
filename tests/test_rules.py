@@ -227,8 +227,8 @@ def test_invalid_arguments_malformed_bsb_is_denied(policy: Policy, bsb: Argument
 
 @pytest.mark.parametrize(
     "account",
-    ["12345", "12345678901", "1234-567x", 12345678.0, True],
-    ids=["five_digits", "eleven_digits", "letter", "float", "bool"],
+    ["1234", "12345678901", "1234-567x", 12345678.0, True],
+    ids=["four_digits", "eleven_digits", "letter", "float", "bool"],
 )
 def test_invalid_arguments_malformed_account_is_denied(
     policy: Policy, account: ArgumentValue
@@ -240,8 +240,8 @@ def test_invalid_arguments_malformed_account_is_denied(
 
 @pytest.mark.parametrize(
     ("bsb", "account"),
-    [("000 910", "123456"), ("000910", "1234-567-890"), ("000910", 12345678)],
-    ids=["six_digit_account", "ten_digit_account", "integer_account"],
+    [("000 910", "12345"), ("000 910", "123456"), ("000910", "1234-567-890"), ("000910", 12345678)],
+    ids=["five_digit_account", "six_digit_account", "ten_digit_account", "integer_account"],
 )
 def test_invalid_arguments_well_formed_payee_passes(
     policy: Policy, bsb: ArgumentValue, account: ArgumentValue
