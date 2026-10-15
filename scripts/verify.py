@@ -31,7 +31,15 @@ STEPS: dict[str, list[str]] = {
 }
 
 # Integrator-owned: changed only at wave boundaries (W0a, W3). See PLAN.md.
-ENABLED_STEPS: list[str] = ["ruff-check", "ruff-format", "mypy", "pytest", "hooks"]
+ENABLED_STEPS: list[str] = [
+    "ruff-check",
+    "ruff-format",
+    "mypy",
+    "pytest",
+    "hooks",
+    "eval",
+    "mutation",
+]
 
 
 def run_steps(steps: Mapping[str, Sequence[str]], enabled: Sequence[str], strict: bool) -> int:

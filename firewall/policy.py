@@ -42,6 +42,10 @@ class _UniqueKeyLoader(yaml.SafeLoader):
         return super().construct_mapping(node, deep=deep)
 
 
+# Public name for other loaders of human-reviewed YAML (eval/run_eval.py thresholds).
+UniqueKeyLoader = _UniqueKeyLoader
+
+
 def _try_load(path: Path) -> Policy | str:
     """Return the validated policy, or a short failure kind that contains no file content."""
     try:
