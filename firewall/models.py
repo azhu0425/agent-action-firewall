@@ -19,7 +19,10 @@ MAX_MESSAGES = 200
 class _Strict(BaseModel):
     # extra="forbid": an unknown field is a malformed request, and malformed means DENY.
     # allow_inf_nan=False: NaN compares False with everything, so it would slip past every cap.
-    model_config = ConfigDict(extra="forbid", frozen=True, allow_inf_nan=False)
+    # hide_input_in_errors=True: a ValidationError must never carry the submitted value (§2.2).
+    model_config = ConfigDict(
+        extra="forbid", frozen=True, allow_inf_nan=False, hide_input_in_errors=True
+    )
 
 
 class Source(StrEnum):
