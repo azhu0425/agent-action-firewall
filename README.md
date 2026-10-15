@@ -55,7 +55,9 @@ FIREWALL_POLICY_PATH=/app/policy/missing.yaml docker compose up -d --force-recre
 # restore:    unset FIREWALL_POLICY_PATH (PowerShell: Remove-Item Env:FIREWALL_POLICY_PATH); docker compose up -d --force-recreate firewall
 ```
 
-Clean up with `docker compose down -v`. Interactive API docs: <http://localhost:8000/docs>.
+There is no web frontend: this is an API. Opening <http://localhost:8000> in a browser redirects to
+the interactive API docs (`/docs`), where you can send the example requests with **Try it out**.
+Clean up with `docker compose down -v`.
 
 ### Option B: local Python
 

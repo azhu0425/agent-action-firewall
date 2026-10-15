@@ -15,7 +15,7 @@ from contextlib import asynccontextmanager
 from pathlib import Path
 
 from fastapi import FastAPI, Request
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, RedirectResponse
 
 from firewall.audit import append_audit
 from firewall.config import Settings, ShadowModeRefused, assert_mode_allowed, get_settings
@@ -69,6 +69,11 @@ def create_app(
     app = FastAPI(title="Agent Action Firewall", lifespan=lifespan)
     install_request_id(app)
     install_error_handlers(app)
+
+    # API-only service: send a browser that opens the base URL to the interactive docs.
+    @app.get("/", include_in_schema=False)
+    def root() -> RedirectResponse:
+        return RedirectResponse("/docs")
 
     @app.get("/health")
     def health(request: Request) -> JSONResponse:
