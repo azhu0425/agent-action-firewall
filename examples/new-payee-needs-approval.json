@@ -1,0 +1,12 @@
+{
+  "request_id": "demo-approval",
+  "agent_role": "customer_assistant",
+  "customer_id": "cust-001",
+  "known_payees": ["000-200 20304050"],
+  "messages": [
+    {"source": "user", "content": "Pay $120 to my plumber, BSB 000-300 account 55501234"}
+  ],
+  "call": {"tool": "transfer_funds",
+           "arguments": {"bsb": "000-300", "account_number": "55501234", "amount": 120,
+                         "payee_name": "Plumber"}}
+}

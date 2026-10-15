@@ -16,35 +16,109 @@ is hash-chained into the audit log, and the money stays put. Taint carries weigh
 $450 injected transfer, under every cap, is denied rather than parked for approval (corpus row
 `atk-002`).
 
-## Prerequisites
+## Run it end to end
 
-- Python 3.12
-- [uv](https://docs.astral.sh/uv/) (recommended) or pip
-- Windows: run `git config core.longpaths true` once before cloning
+Takes about 5 minutes. Needs **Python 3.12** and **git**; [uv](https://docs.astral.sh/uv/) is
+optional. No API keys, no network calls, no Docker. Commands are shown for macOS/Linux (bash) and
+Windows (PowerShell); where only one form is given it works in both.
 
-## Setup
+**1. Clone**
 
 ```bash
-# uv
-uv sync --all-extras
+git config --global core.longpaths true      # Windows only, once
+git clone https://github.com/azhu0425/agent-action-firewall.git
+cd agent-action-firewall
+```
 
-# or pip
+**2. Install** (pick one)
+
+```bash
+# pip
 python -m venv .venv
-.venv\Scripts\activate          # Windows; on macOS/Linux: source .venv/bin/activate
+source .venv/bin/activate                    # PowerShell: .venv\Scripts\Activate.ps1
 pip install -e ".[dev]"
+
+# or uv
+uv sync --all-extras
+source .venv/bin/activate                    # PowerShell: .venv\Scripts\Activate.ps1
 ```
 
-## Run
+Every command below assumes the virtual environment is active (or prefix it with `uv run`).
+
+**3. Run every check** (what CI runs; expect `RESULT: PASS` with 7 steps)
 
 ```bash
-uvicorn firewall.api:app             # POST /v1/evaluate, GET /health on :8000
-docker build -t firewall . && docker run -p 8000:8000 firewall   # same, containerised
+python scripts/verify.py --strict
 ```
+
+**4. See the attack blocked without a server** (scripted agent, in-memory ledger)
+
+```bash
+python -m firewall.cli demo
+```
+
+Without the firewall the injected transfer moves $9,800; with it the call is denied and the
+balance is unchanged (full output under [CLI](#cli)).
+
+**5. Start the API** (terminal 1; leave it running)
+
+```bash
+uvicorn firewall.api:app --port 8000
+```
+
+**6. Send requests** (terminal 2, from the repo root; on Windows type `curl.exe`, not `curl`)
+
+```bash
+curl -s localhost:8000/health
+curl -s -X POST localhost:8000/v1/evaluate -H "Content-Type: application/json" --data-binary "@examples/benign-known-payee.json"
+curl -s -X POST localhost:8000/v1/evaluate -H "Content-Type: application/json" --data-binary "@examples/new-payee-needs-approval.json"
+curl -s -X POST localhost:8000/v1/evaluate -H "Content-Type: application/json" --data-binary "@examples/headline-attack.json"
+```
+
+| Request | Expected |
+|---|---|
+| `/health` | `{"status":"ok","policy_sha256":"…"}` |
+| `benign-known-payee.json` | `"verdict":"ALLOW"` |
+| `new-payee-needs-approval.json` | `"verdict":"REQUIRE_HUMAN_APPROVAL"`, reason `NEW_PAYEE` |
+| `headline-attack.json` | `"verdict":"DENY"`, reasons `AMOUNT_OVER_HARD_CAP`, `NEW_PAYEE`, `TAINTED_ARGUMENT` |
+
+Interactive API docs: <http://localhost:8000/docs>.
+
+**7. Check the audit trail** (terminal 2)
+
+```bash
+python -m firewall.cli verify-audit audit/audit.jsonl    # expect: OK 3 records, head <hash>
+```
+
+Open `audit/audit.jsonl`: one hash-chained record per request, holding an `args_sha256` but never
+an account number. Terminal 1 shows one JSON `decision` log line per request, also value-free.
+
+**8. See it fail closed** (stop the server with Ctrl+C, restart it pointing at a missing policy)
+
+```bash
+FIREWALL_POLICY_PATH=missing.yaml uvicorn firewall.api:app --port 8000
+# PowerShell: $env:FIREWALL_POLICY_PATH="missing.yaml"; uvicorn firewall.api:app --port 8000
+```
+
+Repeat step 6: `/health` returns `503 {"status":"degraded","reason":"policy_unloaded"}` and every
+request, even the benign one, is `DENY` with reason `POLICY_UNLOADED`. Restore with
+`unset FIREWALL_POLICY_PATH` (PowerShell: `Remove-Item Env:FIREWALL_POLICY_PATH`).
+
+**9. Replay the human-written acceptance corpus**
+
+```bash
+python -m firewall.cli replay eval/corpus/attack.jsonl   # expect: 20/20 traces met expectations
+python eval/run_eval.py --gate                            # expect: GATE: PASS (36 rows)
+python eval/run_eval.py --mutation                        # expect: MUTATION: PASS (6/6 rules killed)
+```
+
+### Configuration and deployment notes
 
 Configuration is environment variables only, documented in `.env.example`. No secrets are needed.
-
 Run **one uvicorn worker per audit log**: the hash chain assumes a single writer, and a
-cross-process lock is not built (`evidence/operate.md`).
+cross-process lock is not built (`evidence/operate.md`). A container image is also provided
+(`docker build -t firewall . && docker run -p 8000:8000 firewall`); it is built and smoke-tested
+in CI.
 
 ## Verify
 
@@ -88,10 +162,10 @@ loaded.
 $ curl -s localhost:8000/health
 {"status":"ok","policy_sha256":"97c469dadf01286e34b8c8ba47d5e56ed8cc19788addd0e84a088c3c582be0b5"}
 
-$ curl -s -X POST localhost:8000/v1/evaluate -H "Content-Type: application/json" -d @headline.json
+$ curl -s -X POST localhost:8000/v1/evaluate -H "Content-Type: application/json" --data-binary "@examples/headline-attack.json"
 ```
 
-`headline.json`:
+Request body used for this capture (`examples/headline-attack.json` is the same attack with a different request id and known payee):
 
 ```json
 {
