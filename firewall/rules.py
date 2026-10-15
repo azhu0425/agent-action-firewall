@@ -42,7 +42,7 @@ _SINGLE_ADDRESS = re.compile(r"[^@\s,;<>\"]+@([^@\s,;<>\"]+)")
 _DIGITS = re.compile(r"[0-9]+")
 _BSB_DIGITS = 6
 _ACCOUNT_DIGITS = range(6, 11)
-# Six or more digits joined only by separators: BSB (999-001), account, card. Shorter runs are
+# Six or more digits joined only by separators: BSB (000-910), account, card. Shorter runs are
 # reference numbers and are allowed.
 _PII_RUN = re.compile(r"\d{6,}")
 
