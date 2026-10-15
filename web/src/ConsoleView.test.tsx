@@ -68,6 +68,33 @@ describe("ConsoleView", () => {
     expect(screen.queryByTestId("verdict")).not.toBeInTheDocument();
   });
 
+  it("keeps JSON edits when the editor is closed before evaluating", async () => {
+    const sent: unknown[] = [];
+    vi.stubGlobal(
+      "fetch",
+      vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
+        const url = String(input);
+        if (url.endsWith("/api/health")) return json(200, { status: "ok", policy_sha256: "97c469da" });
+        sent.push(JSON.parse(String(init?.body)));
+        return json(200, DENY);
+      }),
+    );
+    render(<ConsoleView />);
+
+    await userEvent.click(await screen.findByRole("button", { name: "Edit JSON" }));
+    const editor = screen.getByLabelText("Request JSON") as HTMLTextAreaElement;
+    const edited = JSON.parse(editor.value) as { call: { arguments: { amount: number } } };
+    edited.call.arguments.amount = 4321;
+    await userEvent.clear(editor);
+    await userEvent.click(editor);
+    await userEvent.paste(JSON.stringify(edited));
+    await userEvent.click(screen.getByRole("button", { name: "Done editing" }));
+    await userEvent.click(screen.getByRole("button", { name: "Evaluate call" }));
+
+    expect(sent).toHaveLength(1);
+    expect(sent[0]).toMatchObject({ call: { arguments: { amount: 4321 } } });
+  });
+
   it("explains fail-closed when the policy is not loaded", async () => {
     mockFetch({
       "/api/health": () => json(503, { status: "degraded", reason: "policy_unloaded" }),

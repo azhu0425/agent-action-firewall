@@ -67,6 +67,26 @@ def test_audit_endpoint_empty_log(tmp_path: Path) -> None:
     assert response.json()["chain"]["count"] == 0
 
 
+def test_audit_endpoint_sanitises_tampered_fields(tmp_path: Path) -> None:
+    settings = make_settings(tmp_path)
+    with TestClient(create_app(settings)) as client:
+        _run_calls(client, 2)
+        lines = settings.audit_log.read_text(encoding="utf-8").splitlines()
+        tampered = json.loads(lines[0])
+        tampered.update({"verdict": "BOGUS", "reasons": "not-a-list", "tool": {"x": 1}})
+        lines[0] = json.dumps(tampered)
+        settings.audit_log.write_text("\n".join(lines) + "\n", encoding="utf-8")
+        response = client.get("/v1/audit")
+
+    body = response.json()
+    assert response.status_code == 200
+    assert body["chain"]["ok"] is False
+    oldest = body["records"][-1]
+    assert oldest["verdict"] is None
+    assert oldest["reasons"] is None
+    assert oldest["tool"] is None
+
+
 def test_audit_endpoint_reports_broken_chain(tmp_path: Path) -> None:
     settings = make_settings(tmp_path)
     with TestClient(create_app(settings)) as client:
