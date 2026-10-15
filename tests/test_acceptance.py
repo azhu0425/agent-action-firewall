@@ -57,9 +57,7 @@ def restore_logging() -> Iterator[None]:
 
 @pytest.fixture
 def client(tmp_path: Path) -> Iterator[TestClient]:
-    settings = Settings(
-        policy_path=POLICY_PATH, audit_log=tmp_path / "audit.jsonl", app_env="test"
-    )
+    settings = Settings(policy_path=POLICY_PATH, audit_log=tmp_path / "audit.jsonl", app_env="test")
     with TestClient(create_app(settings)) as test_client:
         yield test_client
 

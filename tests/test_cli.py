@@ -95,7 +95,12 @@ def test_cli_replay_exits_nonzero_on_mismatch(
 
 def test_cli_replay_human_corpus_meets_expectations(capsys: pytest.CaptureFixture[str]) -> None:
     code = main(
-        ["replay", str(REPO_ROOT / "eval" / "corpus" / "attack.jsonl"), "--policy", str(POLICY_PATH)]
+        [
+            "replay",
+            str(REPO_ROOT / "eval" / "corpus" / "attack.jsonl"),
+            "--policy",
+            str(POLICY_PATH),
+        ]
     )
 
     assert code == 0

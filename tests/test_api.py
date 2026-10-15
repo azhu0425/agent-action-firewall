@@ -183,9 +183,7 @@ def test_evaluate_endpoint_audits_policy_unloaded_denials(tmp_path: Path) -> Non
 
 def test_evaluate_endpoint_audit_write_failure_denies(tmp_path: Path) -> None:
     # ALLOW_BODY would be allowed; an unaudited ALLOW must never leave the firewall.
-    app = create_app(
-        make_settings(tmp_path), audit_writer=failing_audit(AuditError("disk full"))
-    )
+    app = create_app(make_settings(tmp_path), audit_writer=failing_audit(AuditError("disk full")))
 
     with TestClient(app) as client:
         response = client.post("/v1/evaluate", json=ALLOW_BODY)
