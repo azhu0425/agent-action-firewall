@@ -1,0 +1,3 @@
+# Aider: load the shared agent rules into every session (read-only context).
+read:
+  - AGENTS.md

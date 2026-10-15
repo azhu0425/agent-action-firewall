@@ -1,0 +1,16 @@
+# Human review is required for anything that defines what "correct" or "allowed" means.
+# The last matching pattern wins, so the specific paths below re-state the owner deliberately.
+*                       @azhu0425
+
+# Acceptance data and gate thresholds (human-written; agents must not edit)
+/eval/corpus/           @azhu0425
+/eval/corpus.lock       @azhu0425
+/eval/thresholds.yaml   @azhu0425
+
+# Production behaviour as config
+/policy/                @azhu0425
+
+# Agent guardrails and CI gates
+/AGENTS.md              @azhu0425
+/.claude/               @azhu0425
+/.github/               @azhu0425

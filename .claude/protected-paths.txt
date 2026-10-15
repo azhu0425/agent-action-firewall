@@ -1,0 +1,13 @@
+# Human-owned paths: agents may read these but never write them (AGENTS.md §2.4).
+# One glob per line, relative to the repo root; `**` means anything below.
+# Enforced by .claude/hooks/protect_paths.py (layer 1), CODEOWNERS (2), corpus hash test in CI (3).
+
+# Acceptance data and gate thresholds
+eval/corpus/**
+eval/corpus.lock
+eval/thresholds.yaml
+
+# The agent's own guardrails: an agent must not be able to switch them off
+.claude/settings.json
+.claude/hooks/**
+.claude/protected-paths.txt
