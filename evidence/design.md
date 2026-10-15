@@ -1,7 +1,39 @@
 # Design
 
 ## Architecture overview
+
+```
+ agent orchestrator                         firewall (stateless)                     tools
+ ------------------                         --------------------                     -----
+ model proposes call  --EvalRequest-->  POST /v1/evaluate  or  cli replay
+ + source-tagged msgs                         |  parse into Pydantic models (422 / DENY on bad input)
+ + role, payees (trusted)                     v
+                                         engine.evaluate(request, policy, DEFAULT_RULES)
+                                           |-- 6 pure rules (call, context, policy) -> findings
+                                           |-- most-restrictive-wins; fail-closed wrapper
+                                           v
+                     <--Decision----   Decision  --> audit.append_audit (hash chain, no values)
+ executes only on ALLOW                          --> JSON log line (ids, tool, verdict, reasons)
+ parks APPROVAL for a human
+```
+
+The policy is a YAML file loaded and validated once at startup, and its SHA-256 is stamped on every
+decision and audit record. There is no database and no network call on the decision path.
+
 ## Data flow
+
+1. The orchestrator sends the proposed call, the session messages tagged by `source`, and the
+   trusted context (`agent_role`, `customer_id`, `known_payees`).
+2. FastAPI parses the body into `EvalRequest` (`extra="forbid"`, identifier patterns, size caps,
+   no NaN/Infinity). A parse failure is a 422 that echoes no input; the caller treats it as DENY.
+3. `evaluate` builds an `EvalContext`, runs every rule on deep copies of its inputs, and combines
+   the findings: DENY > REQUIRE_HUMAN_APPROVAL > ALLOW, every reason returned.
+4. The decision is appended to the audit log with `args_sha256` in place of the arguments, then
+   returned with the request id. The JSON log line carries metadata only.
+5. The orchestrator executes the call only on ALLOW.
+
+<!-- TODO(W3): confirm steps 2 and 4 against firewall/api.py (audit failure handling, status codes). -->
+
 ## Contract (frozen in W0a)
 
 The source of truth is `firewall/models.py`, pinned by `tests/test_contract.py`. A change needs a
@@ -73,8 +105,75 @@ fired is returned.
 
 Until its stream lands, each stub fails closed: it raises, or (for `evaluate`) returns
 DENY `EVALUATOR_ERROR`.
+
 ## Component boundaries
+
+| Module | Owns | Never does |
+|---|---|---|
+| `models.py` | The frozen contract: request, decision, policy models, reason codes | Logic |
+| `taint.py` | `normalise`, `tainted_arguments`: lexical value provenance (DR-4) | Decide a verdict |
+| `policy.py` | `load_policy`: size cap, duplicate-key-rejecting safe YAML, schema, sha256 | Return a partial policy |
+| `rules.py` | Six pure rules and `DEFAULT_RULES` | IO, logging, global state |
+| `engine.py` | Combining findings, shadow mode, the only broad `except` | ALLOW on any error |
+| `audit.py` | Hash-chained JSONL append and `verify_chain` | Store argument values or content |
+| `observability.py` | JSON formatter, field allowlist, request id | Emit exception text |
+| `config.py` | Env settings; refuses shadow mode in prod without an override | Read secrets |
+| `http_errors.py` | Request-id middleware, value-free 422 and 500 | Echo input or stack traces |
+| `demo.py` | Scripted prompt-injectable agent and in-memory ledger (DR-5) | Run in the request path |
+| `api.py`, `cli.py` | HTTP and command-line entry points (W3) | Bypass `evaluate` |
+
 ## Failure modes
+
+Every row has a test (AGENTS.md §5).
+
+| Failure | Behaviour | Pinned by |
+|---|---|---|
+| Policy file missing, unreadable, too large, invalid YAML, duplicate keys, schema error | `PolicyError`; no policy loaded, so every call is DENY `POLICY_UNLOADED` and `/health` reports degraded | `test_policy.py`, `test_evaluate_without_policy_denies_policy_unloaded`, W3 health test |
+| Empty rule set | DENY `NO_RULES` | `test_evaluate_with_empty_rule_set_denies` |
+| A rule raises, or returns a non-Finding, an ALLOW finding or an engine-only reason | DENY `EVALUATOR_ERROR`; log carries no rule name or exception text | `test_engine.py` |
+| Unknown tool, or tool not allowed for the role | DENY `NOT_ALLOWLISTED`, in shadow mode too | `test_rules.py`, `test_engine.py` |
+| Unknown argument (`cc`, `bcc`), missing or malformed amount, BSB, account or `to` | DENY `INVALID_ARGUMENT`, in shadow mode too | `test_rules.py` |
+| Unknown request field, NaN/Infinity, oversized input, bad identifiers | 422 with no echoed input; treated as DENY by the caller | `test_contract.py`, `test_http_errors.py` |
+| Unhandled exception in the API | Generic 500 with `request_id`; no traceback in logs or body | `test_http_errors.py`, `test_observability.py` |
+| Audit log tail tampered with | Append refuses (`AuditError`); `verify_chain` returns the first bad index | `test_audit.py` |
+| Shadow mode requested in prod | Refused at startup unless `FIREWALL_ALLOW_SHADOW_IN_PROD=true` | `test_shadow_mode_refused_in_prod_without_override` |
+| Eval thresholds NaN, out of range or duplicated | Gate fails | `test_eval_gate.py` |
+
 ## Security and privacy
+
+- **Prompt injection** is caught structurally, by where a value came from, not by keywords. The
+  backstops are the caps, NEW_PAYEE and PII_EGRESS (DR-4).
+- **Data minimisation.** Findings name arguments, never values. Logs pass through a field
+  allowlist. Audit records hold `args_sha256`. Pydantic errors hide input, and 422 bodies carry
+  only identifier-shaped locations and fixed messages.
+- **Closed schemas.** Each tool has a fixed argument set, and `to` must be one bare address (DR-6).
+- **Trust boundary** as in DR-1: only `call` and non-user messages are untrusted.
+- **Supply chain.** Locked dependencies, `pip-audit` on the lockfile, `bandit`, `gitleaks` over
+  full history, non-root container (`.github/workflows/security.yml`).
+- **Synthetic data only.** BSBs use the `000` prefix; domains are RFC 2606.
+
 ## Technology choices
+
+| Choice | Why |
+|---|---|
+| Python 3.12, FastAPI, Pydantic v2 | Typed boundary parsing with `extra="forbid"`; the panel can read it quickly |
+| Pure-function rules, no rules engine | Six rules do not justify OPA/Rego; pure functions are trivially testable and mutable for the mutation check (DR-2) |
+| Lexical taint over an LLM judge | Deterministic, offline, auditable (DR-4) |
+| YAML policy in git | Policy changes go through PR review and the corpus replay; rollback is a revert |
+| JSONL hash chain | Tamper evidence with no database (DR-3) |
+| uv with a pip fallback | Fast locked installs; pip keeps the README path tool-agnostic |
+
 ## Production / cloud shape
+
+- **Deploy** as a stateless container (the repo's `Dockerfile`) behind an internal load balancer,
+  as a sidecar or a shared service next to the agent orchestrator. Horizontal scaling is free
+  because evaluation keeps no state.
+- **Identity.** mTLS or workload identity between orchestrator and firewall. The role is derived
+  from the caller's identity, not the request body; known payees come from a payee store keyed by
+  `customer_id` (DR-1).
+- **Audit.** One writer per chain (or a log service), records shipped to WORM storage or the SIEM,
+  the chain head anchored externally, and argument hashes keyed by an HMAC from KMS (DR-3).
+- **Policy.** Baked into the image or mounted read-only from a versioned config store. A change
+  ships as a new image through the same pipeline: shadow first, then enforce (`operate.md`).
+- **Observability.** JSON logs to the platform log pipeline; alerts on the DENY rate, on
+  `EVALUATOR_ERROR` and `POLICY_UNLOADED`, and on health status.
