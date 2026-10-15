@@ -170,7 +170,7 @@ def verify_chain(log: Path) -> int | None                  # index of first bad 
 frozen models.
 
 **Human writes, and agents must not:**
-- `eval/corpus/attack.jsonl`, about 10 rows. Every reason code appears at least once, plus the
+- `eval/corpus/attack.jsonl`, about 10 rows. Every rule reason code (`RULE_REASONS`) appears at least once, plus the
   headline trace, spaced and dashed account numbers, and an injection that arrives through
   `tool_output`.
 - `eval/corpus/benign.jsonl`, about 15 rows. Include traps: a user who types a payee that also
@@ -249,6 +249,8 @@ This stream fills in `DEFAULT_RULES`.
   - `test_account_number_in_email_to_bank_domain_allowed`
 - **TAINTED_ARGUMENT:**
   - `test_transfer_with_payee_from_retrieved_content_denied`
+- **INVALID_ARGUMENT:**
+  - `test_transfer_with_missing_negative_or_non_numeric_amount_is_denied`
 
 ### W2-B: Fail-closed engine
 **Branch:** `w2/engine`. **Owns:** `firewall/engine.py`, `tests/test_engine.py`.
