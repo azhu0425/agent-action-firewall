@@ -1,4 +1,4 @@
-"""Policy loader: a valid file loads with its hash; anything else raises PolicyError (fail closed)."""
+"""Policy loader: a valid file loads with its hash; anything else raises PolicyError."""
 
 from __future__ import annotations
 
