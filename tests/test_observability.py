@@ -144,6 +144,26 @@ def test_configure_logging_routes_uvicorn_errors_through_json_formatter(
     assert "Exception in ASGI application" in captured.err
 
 
+def test_configure_logging_replaces_preexisting_root_handlers(
+    restored_logging: None, capsys: pytest.CaptureFixture[str]
+) -> None:
+    # Arrange: a host or harness already put a plain handler on root, which prints tracebacks.
+    root = logging.getLogger()
+    root.handlers = [logging.StreamHandler()]
+
+    configure_logging("INFO")
+    try:
+        raise RuntimeError("SECRET-abc")
+    except RuntimeError:
+        logging.getLogger("tests.observability.host").exception("evaluation failed")
+
+    captured = capsys.readouterr()
+    assert len(root.handlers) == 1
+    assert isinstance(root.handlers[0].formatter, JsonFormatter)
+    assert "SECRET-abc" not in captured.err + captured.out
+    assert captured.err.count("evaluation failed") == 1
+
+
 def test_new_request_id_is_unique_hex() -> None:
     first, second = new_request_id(), new_request_id()
 
