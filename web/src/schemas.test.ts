@@ -21,8 +21,8 @@ describe("DecisionSchema", () => {
   });
 
   it("rejects a missing reasons list", () => {
-    const { reasons: _reasons, ...rest } = decision;
-    expect(DecisionSchema.safeParse(rest).success).toBe(false);
+    const withoutReasons = Object.fromEntries(Object.entries(decision).filter(([k]) => k !== "reasons"));
+    expect(DecisionSchema.safeParse(withoutReasons).success).toBe(false);
   });
 });
 
