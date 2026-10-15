@@ -106,6 +106,44 @@ def test_configure_logging_is_idempotent() -> None:
         root.setLevel(original_level)
 
 
+UVICORN_LOGGERS = ("uvicorn", "uvicorn.error", "uvicorn.access")
+
+
+@pytest.fixture
+def restored_logging() -> Iterator[None]:
+    root = logging.getLogger()
+    saved_root = (list(root.handlers), root.level)
+    saved = {
+        name: (list(logging.getLogger(name).handlers), logging.getLogger(name).propagate)
+        for name in UVICORN_LOGGERS
+    }
+    yield
+    root.handlers = saved_root[0]
+    root.setLevel(saved_root[1])
+    for name, (handlers, propagate) in saved.items():
+        logging.getLogger(name).handlers = handlers
+        logging.getLogger(name).propagate = propagate
+
+
+def test_configure_logging_routes_uvicorn_errors_through_json_formatter(
+    restored_logging: None, capsys: pytest.CaptureFixture[str]
+) -> None:
+    # Arrange: what uvicorn's default log config does, a plain handler that prints tracebacks.
+    uvicorn_error = logging.getLogger("uvicorn.error")
+    uvicorn_error.addHandler(logging.StreamHandler())
+    uvicorn_error.propagate = False
+
+    configure_logging("INFO")
+    try:
+        raise RuntimeError("SECRET-xyz")
+    except RuntimeError as exc:
+        uvicorn_error.error("Exception in ASGI application", exc_info=exc)
+
+    captured = capsys.readouterr()
+    assert "SECRET-xyz" not in captured.err + captured.out
+    assert "Exception in ASGI application" in captured.err
+
+
 def test_new_request_id_is_unique_hex() -> None:
     first, second = new_request_id(), new_request_id()
 

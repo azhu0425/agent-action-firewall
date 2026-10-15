@@ -16,14 +16,17 @@ def settings(**fields: object) -> Settings:
     return Settings(_env_file=None, **fields)  # type: ignore[arg-type]
 
 
+ENV_NAMES = (
+    "FIREWALL_POLICY_PATH",
+    "FIREWALL_AUDIT_LOG",
+    "APP_ENV",
+    "FIREWALL_ALLOW_SHADOW_IN_PROD",
+    "LOG_LEVEL",
+)
+
+
 def test_settings_defaults_match_env_example(monkeypatch: pytest.MonkeyPatch) -> None:
-    for name in (
-        "FIREWALL_POLICY_PATH",
-        "FIREWALL_AUDIT_LOG",
-        "APP_ENV",
-        "FIREWALL_ALLOW_SHADOW_IN_PROD",
-        "LOG_LEVEL",
-    ):
+    for name in ENV_NAMES:
         monkeypatch.delenv(name, raising=False)
 
     result = settings()
@@ -80,7 +83,11 @@ def test_mode_allowed_outside_shadow_in_prod(app_env: str, mode: str) -> None:
     assert_mode_allowed(settings(app_env=app_env), mode)
 
 
-def test_get_settings_is_cached() -> None:
+def test_get_settings_is_cached(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    # Isolated from the developer's environment and any .env in the repo root.
+    for name in ENV_NAMES:
+        monkeypatch.delenv(name, raising=False)
+    monkeypatch.chdir(tmp_path)
     get_settings.cache_clear()
     try:
         assert get_settings() is get_settings()
