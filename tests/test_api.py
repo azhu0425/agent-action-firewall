@@ -103,6 +103,14 @@ def test_health_ok_when_policy_loaded(tmp_path: Path) -> None:
     assert response.json() == {"status": "ok", "policy_sha256": load_policy(POLICY_PATH).sha256}
 
 
+def test_root_redirects_to_interactive_docs(tmp_path: Path) -> None:
+    with TestClient(create_app(make_settings(tmp_path))) as client:
+        response = client.get("/", follow_redirects=False)
+
+    assert response.status_code == 307
+    assert response.headers["location"] == "/docs"
+
+
 def test_health_degraded_and_evaluate_denies_when_policy_missing(tmp_path: Path) -> None:
     settings = make_settings(tmp_path, policy_path=tmp_path / "missing.yaml")
 
