@@ -56,13 +56,17 @@ FIREWALL_POLICY_PATH=/app/policy/missing.yaml docker compose up -d --force-recre
 ```
 
 **Open the console at <http://localhost:3000>.** Pick a scenario and press **Evaluate call**: the
-firewall's decision appears with its reasons, and for injected values a line traces each flagged
-argument back to the email or tool output it came from. **Audit trail** shows the hash-chained,
+firewall's decision appears with its reasons and a plain-language explanation, and for injected
+values a line traces each flagged argument back to the email or tool output it came from.
+**Build your own** lets you write the emails and trusted payees yourself: a scripted agent (no
+LLM) obeys any "transfer $X to BSB … account …" line and proposes the call, which you can edit and
+evaluate. Try the default email, then add its BSB and account as a trusted payee and run it again.
+**Audit trail** shows the hash-chained,
 value-free records; **Corpus** replays all 36 acceptance traces live. In fail-closed mode the
 console shows why every call is denied. The raw API docs are at <http://localhost:8000/docs>.
 
 Clean up with `docker compose down -v`. Both ports are bound to this machine only: the console and
-`GET /v1/audit` have no authentication (local demo, DR-8).
+`GET /v1/audit` / `POST /v1/simulate` have no authentication (local demo, DR-8).
 
 ### Option B: local Python
 

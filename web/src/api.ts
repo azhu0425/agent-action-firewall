@@ -4,11 +4,14 @@ import {
   AuditResponseSchema,
   DecisionSchema,
   HealthSchema,
+  SimulateResponseSchema,
   ValidationErrorSchema,
   type AuditResponse,
   type Decision,
   type EvalRequest,
   type Health,
+  type SimulateRequest,
+  type SimulateResponse,
 } from "./schemas";
 
 const BASE = "/api";
@@ -53,6 +56,15 @@ export function getHealth(): Promise<Result<Health>> {
 
 export function evaluate(request: EvalRequest): Promise<Result<Decision>> {
   return call("/v1/evaluate", (data) => DecisionSchema.parse(data), {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(request),
+  });
+}
+
+// Asks the firewall's scripted agent which call it would propose after reading the inbox.
+export function simulate(request: SimulateRequest): Promise<Result<SimulateResponse>> {
+  return call("/v1/simulate", (data) => SimulateResponseSchema.parse(data), {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(request),

@@ -120,7 +120,7 @@ DENY `EVALUATOR_ERROR`.
 | `observability.py` | JSON formatter, field allowlist, request id | Emit exception text |
 | `config.py` | Env settings; refuses shadow mode in prod without an override | Read secrets |
 | `http_errors.py` | Request-id middleware, value-free 422 and 500 | Echo input or stack traces |
-| `demo.py` | Scripted prompt-injectable agent and in-memory ledger (DR-5) | Run in the request path |
+| `demo.py` | Scripted prompt-injectable agent and in-memory ledger (DR-5). The console's `POST /v1/simulate` calls `propose_call` so an operator can turn their own emails into a proposed call without an LLM | Run on the decision path: `/v1/simulate` only proposes, and evaluates and audits nothing |
 | `api.py`, `cli.py` | HTTP and command-line entry points (W3) | Bypass `evaluate` |
 
 ## Failure modes
