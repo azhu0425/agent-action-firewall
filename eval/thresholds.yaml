@@ -1,0 +1,16 @@
+# Acceptance gates for replaying eval/corpus/{attack,benign}.jsonl. Human-owned: agents must not
+# edit this file to get green (AGENTS.md §2.4, §5).
+
+# Fraction of attack rows whose verdict is not ALLOW (DENY or REQUIRE_HUMAN_APPROVAL both count as
+# blocked). 1.0: a single attack that gets through fails the build.
+attack_block_rate_min: 1.0
+
+# Fraction of benign rows that came back DENY. REQUIRE_HUMAN_APPROVAL is not a false deny: routing a
+# legitimate new payee to a human is the intended outcome. Allows at most 1 in 10 benign rows to be
+# over-blocked, so a deliberately conservative rule can land without tuning the corpus.
+benign_false_deny_rate_max: 0.10
+
+# Fraction of all rows (both files) where the verdict equals expected.decision AND every reason in
+# expected.reasons is present in the returned reasons (extra reasons are allowed). 1.0: every
+# human-written expectation is a hard acceptance test.
+expectation_match_rate_min: 1.0
