@@ -5,7 +5,7 @@
 | How | Command |
 |---|---|
 | Local API | `uvicorn firewall.api:app` (port 8000): `POST /v1/evaluate`, `GET /health` |
-| Container | `docker build -t firewall . && docker run -p 8000:8000 firewall` |
+| Container | `docker compose up --build -d`; tools: `docker compose run --rm verify\|demo\|replay\|verify-audit` |
 | Batch replay | `python -m firewall.cli replay <traces.jsonl>`: exits non-zero on any mismatch |
 | Demo | `python -m firewall.cli demo`: the naive agent with and without the firewall |
 | Audit check | `python -m firewall.cli verify-audit <log>`: index of the first bad record, or intact |

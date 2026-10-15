@@ -1,12 +1,7 @@
-# Only pyproject.toml, uv.lock, README.md, firewall/ and policy/ are copied into the image.
-# Everything else stays out of the build context: secrets, VCS data, caches, local state.
+# The runtime image copies only firewall/, policy/, eval/corpus/ and examples/ (see Dockerfile).
+# The verify image copies the whole context, so this file keeps secrets, VCS data, caches and
+# local state out of every build.
 .git
-.github
-.claude
-.cursor
-.gemini
-.windsurf
-.clinerules
 .venv
 venv
 **/__pycache__
@@ -19,11 +14,10 @@ coverage.xml
 htmlcov
 .env
 .env.*
+!.env.example
 audit
 *.audit.jsonl
-eval
-tests
-docs
-evidence
-scripts
+.claude/worktrees
+.claude/settings.local.json
+.claude/plans
 *exercise-brief*.md

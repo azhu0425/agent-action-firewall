@@ -52,25 +52,56 @@ jobs:
           git /repo --redact --no-banner --verbose --exit-code 1
 
   container:
+    # Runs the README's Docker walkthrough (Option A) exactly as a reviewer would.
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v6
-      - name: Build image
-        run: docker build -t agent-action-firewall:ci .
-      - name: Run container
-        run: docker run -d --name firewall -p 8000:8000 agent-action-firewall:ci
-      - name: Smoke test /health
+      - name: Build and start (docker compose up --build -d)
+        run: docker compose up --build -d
+      - name: Wait for a healthy container
         run: |
           for _ in $(seq 1 30); do
             if curl -fsS localhost:8000/health; then echo; exit 0; fi
-            sleep 1
+            sleep 2
           done
-          echo "health check never returned 2xx"
-          docker logs firewall
-          exit 1
+          docker compose logs firewall; exit 1
       - name: Container runs as non-root
-        run: test "$(docker exec firewall id -u)" != "0"
-      - name: Stop container
+        run: test "$(docker compose exec -T firewall id -u)" != "0"
+      - name: Full strict check suite inside the verify image
+        run: docker compose run --rm verify
+      - name: Demo moves money without the firewall and none with it
+        run: |
+          out="$(docker compose run --rm demo)"; echo "$out"
+          grep -q 'money moved: \$9,800.00' <<<"$out"
+          grep -q 'money moved: none' <<<"$out"
+      - name: Example requests return the documented verdicts
+        run: |
+          check() {
+            got="$(curl -fsS -X POST localhost:8000/v1/evaluate -H 'Content-Type: application/json' \
+              --data-binary "@examples/$1.json" | python3 -c 'import sys,json; print(json.load(sys.stdin)["verdict"])')"
+            echo "$1 -> $got"; test "$got" = "$2"
+          }
+          check benign-known-payee ALLOW
+          check new-payee-needs-approval REQUIRE_HUMAN_APPROVAL
+          check headline-attack DENY
+      - name: Audit chain verifies and logs carry no argument values
+        run: |
+          docker compose run --rm verify-audit | tee /dev/stderr | grep -q '^OK 3 records'
+          ! docker compose logs firewall | grep -E '12345678|20304050|55501234'
+      - name: Corpus replay
+        run: docker compose run --rm replay | tee /dev/stderr | grep -q '20/20 traces met expectations'
+      - name: Fail closed with a missing policy
+        run: |
+          FIREWALL_POLICY_PATH=/app/policy/missing.yaml docker compose up -d --force-recreate firewall
+          for _ in $(seq 1 30); do
+            code="$(curl -s -o /dev/null -w '%{http_code}' localhost:8000/health || true)"
+            [ "$code" = "503" ] && break; sleep 2
+          done
+          test "$code" = "503"
+          verdict="$(curl -fsS -X POST localhost:8000/v1/evaluate -H 'Content-Type: application/json' \
+            --data-binary @examples/benign-known-payee.json | python3 -c 'import sys,json; d=json.load(sys.stdin); print(d["verdict"], *d["reasons"])')"
+          echo "$verdict"; test "$verdict" = "DENY POLICY_UNLOADED"
+      - name: Tear down
         if: always()
-        run: docker rm -f firewall
+        run: docker compose down -v

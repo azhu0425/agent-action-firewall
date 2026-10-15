@@ -36,8 +36,10 @@ exposed a wrong account-length bound in the rules, fixed test-first (`679eb6a` r
 
 ## Known gaps
 
-- The Docker build and gitleaks were not run locally (Docker daemon not running on the authoring
-  machine); their first real run is in CI.
+- gitleaks runs only in CI. The Docker walkthrough (README Option A) was run locally on Docker
+  Desktop 29.0.1 (Windows, Linux containers) and runs on every PR in the `container` CI job:
+  compose up, strict verify inside the `verify` image, demo, the three example verdicts, audit
+  chain, value-free logs, corpus replay, and fail-closed degraded mode.
 - GitHub Actions and tool versions are pinned by tag, not by commit SHA. Dependabot is configured
   for security updates only. SHA pinning was deferred in the W0a review and is still open.
 - The Claude PR-review action is skipped while `CLAUDE_CODE_OAUTH_TOKEN` is unset. The
