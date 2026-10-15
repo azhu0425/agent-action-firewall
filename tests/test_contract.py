@@ -197,7 +197,7 @@ def test_decision_rejects_inconsistent_states(fields: dict[str, object]) -> None
 
 
 def test_validation_errors_never_echo_submitted_values() -> None:
-    secret = "BSB 062-000 acct 99887766"
+    secret = "BSB 000-100 acct 99887766"
     with pytest.raises(ValidationError) as excinfo:
         request(customer_id=secret)
 

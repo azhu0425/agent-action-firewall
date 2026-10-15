@@ -43,7 +43,8 @@ describes it in the same PR.
    request id, tool name, decision, reason codes and latency only.
 3. **Synthetic data only.** Phone numbers from the ACMA fictional ranges (`0491 570 xxx`,
    `02 5550 xxxx`). Domains from RFC 2606 (`example.com`, `*.test`). Luhn-invalid card numbers.
-   Made-up BSBs. No real people, customers, staff or Westpac data.
+   BSBs only with the `000` prefix (`000-100`, `000-200`, …), which no listed institution uses;
+   never a real-looking prefix such as 06x (CBA), 03x/73x (Westpac) or 63x (building societies). No real people, customers, staff or Westpac data.
 4. **Human-owned files are read-only for agents.** These are listed in
    `.claude/protected-paths.txt`: the eval corpus, its hash lock, thresholds and the agent
    guardrails themselves. Three layers enforce this: a Claude Code hook, `CODEOWNERS` review and
@@ -157,7 +158,7 @@ Comments are for the reviewer six months from now. **Explain why. The code alrea
 | Invariants and security constraints: `# Fail closed: an evaluator error must never ALLOW` | Step narration: `# loop over the rules` |
 | Format or unit assumptions: `# amounts are integer cents` | Change history: `# fixed bug`, `# new`, `# updated to use X` |
 | Known limitations: `# taint is lexical; paraphrase evades it (decisions.md#DR-4)` | AI artefacts: `# Here is the updated function`, apologies, praise |
-| Regex intent with an example: `# BSB: 062-000 or 062000` | Commented-out code (git remembers it) |
+| Regex intent with an example: `# BSB: 000-100 or 000100` | Commented-out code (git remembers it) |
 | `TODO(#12): …` linked to an issue | A bare `TODO`/`FIXME` |
 
 - Write docstrings on public modules and functions **when the contract is not obvious from the

@@ -18,7 +18,7 @@ from firewall.models import (
     Verdict,
 )
 
-SECRET_MARKER = "SECRET-062000-99887766"
+SECRET_MARKER = "SECRET-000100-99887766"
 
 
 def make_request(**overrides: object) -> EvalRequest:
