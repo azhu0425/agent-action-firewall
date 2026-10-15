@@ -134,6 +134,33 @@ def test_evaluate_rule_exception_message_never_logged(
     assert all(SECRET_MARKER not in str(r.__dict__) for r in caplog.records)
 
 
+STANDARD_RECORD_ATTRS = frozenset(logging.makeLogRecord({}).__dict__) | {"message", "asctime"}
+# AGENTS.md §2.2: request id, tool name, decision, reason codes and latency only.
+ALLOWED_EXTRA_ATTRS = frozenset({"request_id", "fields"})
+
+
+def test_evaluate_rule_exception_log_carries_only_allowed_fields(
+    policy: Policy, caplog: pytest.LogCaptureFixture
+) -> None:
+    caplog.set_level(logging.DEBUG, logger="firewall.engine")
+
+    evaluate(make_request(request_id="req-7"), policy, rules=[raising_rule])
+
+    records = [r for r in caplog.records if r.name == "firewall.engine"]
+    assert len(records) == 1
+    record = records[0]
+    assert set(record.__dict__) - STANDARD_RECORD_ATTRS <= ALLOWED_EXTRA_ATTRS
+    assert record.__dict__.get("request_id") == "req-7"
+    assert record.__dict__.get("fields") == {
+        "tool": "get_account_summary",
+        "verdict": "DENY",
+        "reasons": ["EVALUATOR_ERROR"],
+    }
+    rendered = record.getMessage() + str(record.__dict__)
+    assert "raising_rule" not in rendered
+    assert "ValueError" not in rendered
+
+
 def test_shadow_mode_rule_exception_still_denies(shadow_policy: Policy) -> None:
     decision = evaluate(make_request(), shadow_policy, rules=[raising_rule])
 
