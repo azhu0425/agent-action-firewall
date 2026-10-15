@@ -89,7 +89,7 @@ wrappers around it. Do not hand-roll a different check sequence and call it "ver
    ran it in this session and saw the result.
 7. **Self-review.** A fresh-context reviewer (the `code-reviewer` subagent, or a second agent)
    reviews `git diff origin/main...HEAD`. Fix every P0/P1 finding before pushing.
-8. **PR.** Push the branch and open a PR using the template. CI and AI review run. A human merges.
+8. **PR.** Push the branch and open a PR using the template. CI and AI review run. A human merges, unless the human has delegated merging (see §10).
 9. **Evidence.** Draft intervention-log rows (§12) for anything the human corrected.
 
 ### Parallel streams (`PLAN.md` waves)
@@ -202,8 +202,12 @@ Comments are for the reviewer six months from now. **Explain why. The code alrea
 
 ## 10. Agents must not
 
-- Push to `main`, merge PRs, create or delete repositories, change repository settings or add
-  secrets. These are human actions; agents may prepare the exact command.
+- Push to `main`, create or delete repositories, change repository settings or add secrets
+  without the human's explicit instruction. Merging PRs is human-owned by default. In this
+  repository the human has delegated it to the integrator agent (DR-7). The integrator may merge
+  only after `verify` is green and every P0/P1 review finding is fixed or answered. The
+  main-branch ruleset enforces this server-side (PR, `verify` check, resolved threads, merge
+  commits only).
 - Write to protected paths, or modify or disable hooks, permission settings or CI gates in order
   to get past them.
 - Run destructive git commands (`reset --hard`, `clean -fdx`, `push --force`, `branch -D` on

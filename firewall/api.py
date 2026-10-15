@@ -84,8 +84,12 @@ def create_app(
         started = time.perf_counter()
         resolved: Settings = request.app.state.settings
         policy: Policy | None = request.app.state.policy
+        # One canonical id per call: a body id (already pattern-validated) wins over X-Request-ID,
+        # and the middleware echoes whatever is on request.state in the response header.
         if body.request_id is None:
             body = body.model_copy(update={"request_id": request.state.request_id})
+        else:
+            request.state.request_id = body.request_id
         decision = evaluate(body, policy)
         policy_sha256 = policy.sha256 if policy is not None else ""
         try:

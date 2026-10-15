@@ -45,7 +45,9 @@ class RequestIdMiddleware:
 
         async def send_with_id(message: Message) -> None:
             if message["type"] == "http.response.start":
-                MutableHeaders(scope=message)[REQUEST_ID_HEADER] = request_id
+                # Read back from state: a route may replace the id with the body's request_id.
+                final_id = scope["state"].get("request_id", request_id)
+                MutableHeaders(scope=message)[REQUEST_ID_HEADER] = final_id
             await send(message)
 
         token = request_id_var.set(request_id)

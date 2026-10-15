@@ -133,6 +133,19 @@ def test_cli_replay_missing_policy_exits_two(
     assert code == 2
 
 
+@pytest.mark.parametrize("content", ["", "\n", "  \n\t\n"], ids=["empty", "newline", "blank"])
+def test_cli_replay_empty_traces_file_exits_two(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str], content: str
+) -> None:
+    # Zero traces would print "0/0 traces met expectations" and pass: an empty file is a load error.
+    traces = tmp_path / "traces.jsonl"
+    traces.write_text(content, encoding="utf-8")
+
+    code = main(["replay", str(traces), "--policy", str(POLICY_PATH)])
+
+    assert code == 2
+
+
 def write_audit(log: Path, count: int) -> None:
     row = trace("aud", source="user", decision="ALLOW", reasons=[])
     request = EvalRequest.model_validate(row["request"])
@@ -213,12 +226,13 @@ def test_cli_demo_without_firewall_only(capsys: pytest.CaptureFixture[str]) -> N
     assert "firewall: DENY" not in out
 
 
-def test_cli_demo_missing_policy_still_denies(
+def test_cli_demo_missing_policy_still_denies_and_exits_two(
     tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
     code = main(["demo", "--with-firewall", "--policy", str(tmp_path / "missing.yaml")])
 
     out = capsys.readouterr().out
-    assert code == 0
+    # The demo still shows the fail-closed DENY, but a script must see that the load failed.
+    assert code == 2
     assert "firewall: DENY (POLICY_UNLOADED)" in out
     assert "money moved: none" in out

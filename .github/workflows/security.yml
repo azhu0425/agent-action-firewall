@@ -1,0 +1,76 @@
+name: Security
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: security-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  bandit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v6
+      - uses: astral-sh/setup-uv@v6
+        with:
+          python-version: "3.12"
+      - name: Bandit (static analysis of firewall/ and eval/)
+        run: uvx bandit==1.9.4 -r firewall eval
+
+  pip-audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v6
+      - uses: astral-sh/setup-uv@v6
+        with:
+          python-version: "3.12"
+      # Audits exactly what uv.lock pins (runtime and dev), hash-checked, without resolving again.
+      - name: Export locked requirements
+        run: uv export --frozen --all-extras --no-emit-project --format requirements-txt -o requirements.lock.txt
+      - name: pip-audit
+        run: uvx pip-audit==2.10.1 -r requirements.lock.txt --require-hashes --disable-pip --progress-spinner off
+
+  gitleaks:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0 # scan every commit, not just the tip
+      # The CLI image instead of gitleaks-action: no licence key and no token needed.
+      - name: gitleaks (full history)
+        run: >
+          docker run --rm -v "$PWD:/repo" ghcr.io/gitleaks/gitleaks:v8.30.0
+          git /repo --redact --no-banner --verbose --exit-code 1
+
+  container:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v6
+      - name: Build image
+        run: docker build -t agent-action-firewall:ci .
+      - name: Run container
+        run: docker run -d --name firewall -p 8000:8000 agent-action-firewall:ci
+      - name: Smoke test /health
+        run: |
+          for _ in $(seq 1 30); do
+            if curl -fsS localhost:8000/health; then echo; exit 0; fi
+            sleep 1
+          done
+          echo "health check never returned 2xx"
+          docker logs firewall
+          exit 1
+      - name: Container runs as non-root
+        run: test "$(docker exec firewall id -u)" != "0"
+      - name: Stop container
+        if: always()
+        run: docker rm -f firewall

@@ -154,6 +154,39 @@ def test_evaluate_endpoint_keeps_caller_request_id(tmp_path: Path) -> None:
     assert Decision.model_validate(response.json()).request_id == "orch-42"
 
 
+def test_evaluate_endpoint_body_request_id_wins_everywhere_over_header(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    # One canonical id per call: the body id (validated by EvalRequest) beats X-Request-ID, and
+    # the decision, audit record, log lines and response header all carry it.
+    settings = make_settings(tmp_path)
+    body = request_body(source="user", known=True, request_id="orch-42")
+
+    with TestClient(create_app(settings)) as client:
+        response = client.post("/v1/evaluate", json=body, headers={"X-Request-ID": "hdr-7"})
+
+    request_ids = {
+        json.loads(line)["request_id"] for line in capsys.readouterr().err.splitlines() if line
+    } - {"-"}
+    record = json.loads(settings.audit_log.read_text(encoding="utf-8"))
+    assert response.json()["request_id"] == "orch-42"
+    assert response.headers["X-Request-ID"] == "orch-42"
+    assert record["request_id"] == "orch-42"
+    assert request_ids == {"orch-42"}
+
+
+def test_evaluate_endpoint_header_request_id_used_when_body_has_none(tmp_path: Path) -> None:
+    settings = make_settings(tmp_path)
+
+    with TestClient(create_app(settings)) as client:
+        response = client.post("/v1/evaluate", json=ALLOW_BODY, headers={"X-Request-ID": "hdr-7"})
+
+    record = json.loads(settings.audit_log.read_text(encoding="utf-8"))
+    assert response.json()["request_id"] == "hdr-7"
+    assert response.headers["X-Request-ID"] == "hdr-7"
+    assert record["request_id"] == "hdr-7"
+
+
 def test_evaluate_endpoint_writes_exactly_one_audit_record_per_call(tmp_path: Path) -> None:
     settings = make_settings(tmp_path)
 

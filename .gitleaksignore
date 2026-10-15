@@ -1,0 +1,8 @@
+# Reviewed false positives (generic-api-key on test sentinel constants named SECRET_*).
+# Each value is a synthetic marker used by leak tests to prove values never reach
+# logs/errors; none is a credential. Fingerprints are pinned to commit:file:rule:line,
+# so any new finding still fails the job. Reviewed by the integrator, PR #15.
+05198da3beb993c16fd228db7d46d48891331c3a:tests/test_eval_gate.py:generic-api-key:34
+da13d379477c7371a9c5d37a56e650e0437e1cbb:tests/test_http_errors.py:generic-api-key:14
+89e49e215804df630b22166c5a42fd041fb97e02:tests/test_policy.py:generic-api-key:29
+484ac0eb36d65c4b64a3c5f7c161ad6c6a00e8a9:tests/test_audit.py:generic-api-key:27

@@ -131,5 +131,6 @@
 | Database, auth, multi-tenancy | Stateless evaluation is enough for the slice. Production shape is in `operate.md` |
 | Policy hot reload | A policy change is a deploy (PR, CI replays the corpus, revert to roll back) |
 | OPA/Rego, rate limiting, an ML injection classifier | Scope (DR-2, DR-4) |
+| Cross-process audit lock / multiple workers | Single writer per audit log (one uvicorn worker). Production would use an audit log service (DR-3, Codex review of PR #14) |
 | HMAC on audit hashes, external chain anchoring | Needs a KMS or WORM store (DR-3) |
 | Approval resolution endpoint | Stretch S1. REQUIRE_HUMAN_APPROVAL parks the call |

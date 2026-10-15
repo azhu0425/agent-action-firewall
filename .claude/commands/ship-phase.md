@@ -54,8 +54,9 @@ Read the review comments from the Claude action and the Codex reviewer
 - If no review arrives within 5 minutes, note "AI review pending" in the PR and continue.
 
 ## 8. Hand back
-Report the PR URL, the CI status, the review dispositions, and the merge command for the
-**human** to run:
+Report the PR URL, the CI status and the review dispositions. If the human has delegated merging
+(AGENTS.md §10, DR-7), the integrator merges once the gates are green and the threads resolved.
+Otherwise, hand the merge command to the human:
 `gh pr merge <n> --merge --delete-branch`. **Never use `--squash`, `--rebase` or `--admin`.** The
 brief requires the history to stay intact.
 
