@@ -30,7 +30,7 @@ exposed a wrong account-length bound in the rules, fixed test-first (`679eb6a` r
 |---|---|---|
 | Local, while coding | `python scripts/verify.py`, pre-commit (whitespace, YAML, private keys, ruff) | The agent may not claim "verified" without this run (AGENTS.md §4.6) |
 | Local, agent guardrails | `protect_paths` hook, `require_plan_review` hook, permission deny list | Blocks writes to human-owned files and leaving plan mode unreviewed |
-| Pull request | `ci.yml` job `verify` (`uv sync --locked`, `verify.py --strict`); `security.yml` (bandit, pip-audit, gitleaks, container build + `/health` smoke); `code-reviewer` subagent; Codex review; Claude review action when its secret is set | Ruleset on `main`: PR required, `verify` green, review threads resolved, merge commits only |
+| Pull request | `ci.yml` job `verify` (`uv sync --locked`, `verify.py --strict`); `security.yml` (bandit, pip-audit, gitleaks, container build + `/health` smoke); `code-reviewer` subagent; Codex review; Claude review action when its secret is set | Ruleset on `main`: PR required, `verify` green, review threads resolved, squash merges only |
 | After merge (`main`) | `ci.yml` and `security.yml` re-run on push | A red `main` is fixed forward or reverted |
 | Release (W5) | Fresh clone, follow the README exactly, `gitleaks detect`, tag `v0.1.0` | Human says yes before the tag is pushed |
 

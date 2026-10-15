@@ -176,8 +176,9 @@ Comments are for the reviewer six months from now. **Explain why. The code alrea
   fewer. The body says *why* and what was verified. Keep red and green commits separate. Do not
   add a `Co-authored-by:` trailer or a "Generated with" footer for the agent to commits or PRs;
   AI usage is recorded in the PR description's AI-usage section instead.
-- **Merging** uses a merge commit only: `gh pr merge <n> --merge --delete-branch`. **Never squash
-  or rebase-merge.** The exercise brief requires the incremental history to stay intact. Never
+- **Merging** uses squash only: `gh pr merge <n> --squash --delete-branch`, so each PR lands
+  on `main` as one commit (the human's decision). Red and green commits stay visible on the PR
+  itself. Never use a merge commit or rebase-merge. Never
   force-push, amend or rebase pushed commits, rewrite history, or use `--no-verify`.
 - **PR size.** One stream, ideally under 400 changed lines (excluding lockfiles and data). Split it
   if bigger.
