@@ -36,8 +36,16 @@ packages = ["firewall"]
 line-length = 100
 target-version = "py312"
 
+[tool.ruff.format]
+# Human-owned guard code (AGENTS.md §2.4): agents cannot reformat it, so it is checked by
+# `ruff check` only. The human formats it when editing it.
+exclude = [".claude/hooks/*"]
+
 [tool.ruff.lint]
 select = ["E", "F", "I", "B", "UP", "SIM"]
+
+[tool.ruff.lint.per-file-ignores]
+".claude/hooks/*" = ["E501"]
 
 [tool.mypy]
 strict = true

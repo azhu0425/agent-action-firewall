@@ -19,9 +19,7 @@ POINTER_FILES = [
 
 
 @pytest.mark.parametrize("relative_path", POINTER_FILES)
-def test_every_agent_pointer_file_references_agents_md(
-    repo_root: Path, relative_path: str
-) -> None:
+def test_every_agent_pointer_file_references_agents_md(repo_root: Path, relative_path: str) -> None:
     text = (repo_root / relative_path).read_text(encoding="utf-8")
 
     assert "AGENTS.md" in text

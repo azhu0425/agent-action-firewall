@@ -99,4 +99,3 @@ def test_policy_rejects_hard_cap_below_soft_cap() -> None:
 def test_tool_call_requires_tool_name() -> None:
     with pytest.raises(ValidationError):
         ToolCall.model_validate({"tool": "", "arguments": {}})
-
