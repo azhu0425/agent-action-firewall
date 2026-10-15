@@ -19,6 +19,7 @@ from firewall.audit import append_audit, verify_chain
 from firewall.config import Settings
 from firewall.errors import AuditError
 from firewall.models import Decision, EvalRequest, Reason, Verdict
+from firewall.observability import request_id_var
 from firewall.policy import load_policy
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
@@ -181,6 +182,37 @@ def test_evaluate_endpoint_body_request_id_wins_everywhere_over_header(
     assert response.headers["X-Request-ID"] == "orch-42"
     assert record["request_id"] == "orch-42"
     assert request_ids == {"orch-42"}
+
+
+@pytest.mark.parametrize(
+    ("header", "body_request_id"),
+    [
+        ("hdr-7", "orch-42"),
+        ("hdr-7", None),
+        (None, None),
+        ("bad id!", None),
+    ],
+    ids=["body_over_header", "header_only", "neither", "malformed_header"],
+)
+def test_evaluate_endpoint_request_id_context_var_matches_canonical_id(
+    tmp_path: Path, header: str | None, body_request_id: str | None
+) -> None:
+    # Code on the request path that logs without an explicit id reads request_id_var, so it must
+    # hold the same canonical id as the decision (issue #16).
+    seen: list[str] = []
+
+    def spy_audit(path: Path, decision: Decision, request: EvalRequest, policy_sha: str) -> None:
+        seen.append(request_id_var.get())
+        append_audit(path, decision, request, policy_sha)
+
+    body = request_body(source="user", known=True, request_id=body_request_id)
+    headers = {"X-Request-ID": header} if header is not None else {}
+
+    with TestClient(create_app(make_settings(tmp_path), audit_writer=spy_audit)) as client:
+        response = client.post("/v1/evaluate", json=body, headers=headers)
+
+    assert seen == [response.json()["request_id"]]
+    assert seen == [response.headers["X-Request-ID"]]
 
 
 def test_evaluate_endpoint_header_request_id_used_when_body_has_none(tmp_path: Path) -> None:

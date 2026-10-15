@@ -61,6 +61,14 @@ def install_request_id(app: FastAPI) -> None:
     app.add_middleware(RequestIdMiddleware)
 
 
+def adopt_request_id(request: Request, request_id: str) -> None:
+    """Make `request_id` the call's canonical id for the response header and for log lines."""
+    request.state.request_id = request_id
+    # No reset needed: this set cannot outlive the request. Sync routes run in a copied context
+    # on the thread pool, and RequestIdMiddleware's reset(token) restores the prior value anyway.
+    request_id_var.set(request_id)
+
+
 def _request_id(request: Request) -> str:
     request_id = getattr(request.state, "request_id", None)
     return request_id if isinstance(request_id, str) else new_request_id()

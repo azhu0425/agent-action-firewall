@@ -22,7 +22,7 @@ from firewall.audit import append_audit, chain_head, read_records, verify_chain
 from firewall.config import Settings, ShadowModeRefused, assert_mode_allowed, get_settings
 from firewall.engine import evaluate
 from firewall.errors import AuditError, PolicyError
-from firewall.http_errors import install_error_handlers, install_request_id
+from firewall.http_errors import adopt_request_id, install_error_handlers, install_request_id
 from firewall.models import Decision, EvalRequest, Policy, Reason, Verdict
 from firewall.observability import configure_logging
 from firewall.policy import load_policy
@@ -157,7 +157,7 @@ def create_app(
         if body.request_id is None:
             body = body.model_copy(update={"request_id": request.state.request_id})
         else:
-            request.state.request_id = body.request_id
+            adopt_request_id(request, body.request_id)
         decision = evaluate(body, policy)
         policy_sha256 = policy.sha256 if policy is not None else ""
         try:

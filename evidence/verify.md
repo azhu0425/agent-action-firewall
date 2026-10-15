@@ -4,12 +4,19 @@
 
 Results below were run on 2026-10-15 in the W4 worktree, with main (including W3, PR #14) merged in.
 
+Source of the test count: the pytest summary line printed by `python scripts/verify.py --strict`.
+On `fix/issue-16` (2026-10-15) it printed `395 passed, 1 warning` with total coverage 98.81%, and
+all 7 steps passed. Only the tests row was updated from that run. The
+main CI run before that branch, [38686019616](https://github.com/azhu0425/agent-action-firewall/actions/runs/38686019616)
+at `19754ec`, printed `391 passed, 1 warning` in its `verify` job. Issue #16 added the four extra
+tests.
+
 | Check | Command | Result |
 |---|---|---|
 | Lint | `ruff check .` | PASS |
 | Format | `ruff format --check .` | PASS |
 | Types | `mypy` (strict, `firewall/`) | PASS |
-| Tests + coverage | `pytest --cov=firewall --cov-fail-under=80` | PASS: 391 tests, 99% branch coverage |
+| Tests + coverage | `pytest --cov=firewall --cov-fail-under=80` | PASS: 395 tests, 98.81% total coverage (branch-enabled), re-run on `fix/issue-16`; see source below |
 | Hook self-tests | `python -m unittest discover -s .claude/hooks` | PASS: 35 tests |
 | Eval gate | `python eval/run_eval.py --gate` | PASS: 20 attack, 16 benign; attack block rate 1.0, benign false-deny rate 0.0, expectation match 1.0 |
 | Mutation | `python eval/run_eval.py --mutation` | PASS: all 6 rules killed (removing any one lets an attack verdict get less severe) |
@@ -40,8 +47,9 @@ exposed a wrong account-length bound in the rules, fixed test-first (`679eb6a` r
   Desktop 29.0.1 (Windows, Linux containers) and runs on every PR in the `container` CI job:
   compose up, strict verify inside the `verify` image, demo, the three example verdicts, audit
   chain, value-free logs, corpus replay, and fail-closed degraded mode.
-- GitHub Actions and tool versions are pinned by tag, not by commit SHA. Dependabot is configured
-  for security updates only. SHA pinning was deferred in the W0a review and is still open.
+- GitHub Actions are pinned by commit SHA and the gitleaks image by digest (issue #16). Python
+  tools run by exact version (`uvx bandit==…`). Dependabot is configured for security updates
+  only, so the pins move only when someone bumps them on purpose.
 - The Claude PR-review action is skipped while `CLAUDE_CODE_OAUTH_TOKEN` is unset. The
   `code-reviewer` subagent and Codex stand in for it.
 - The red-team pass (W4-A) and the README fresh-clone check (W3 checkpoint, W5) are later steps.
