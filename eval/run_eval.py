@@ -40,7 +40,7 @@ from firewall.models import (  # noqa: E402
     Reason,
     Verdict,
 )
-from firewall.policy import _UniqueKeyLoader, load_policy  # noqa: E402
+from firewall.policy import UniqueKeyLoader, load_policy  # noqa: E402
 from firewall.rules import DEFAULT_RULES, Rule  # noqa: E402
 
 POLICY_PATH = REPO_ROOT / "policy" / "policy.yaml"
@@ -134,7 +134,7 @@ def load_thresholds(path: Path) -> dict[str, object]:
     by check_gate."""
     try:
         # Duplicate keys rejected: a later `..._min: 0.0` must not silently win in review.
-        data = yaml.load(path.read_bytes(), Loader=_UniqueKeyLoader)  # noqa: S506 - SafeLoader
+        data = yaml.load(path.read_bytes(), Loader=UniqueKeyLoader)  # noqa: S506 - SafeLoader
     except yaml.YAMLError:
         data = None
     if not isinstance(data, dict):
