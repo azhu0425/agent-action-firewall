@@ -39,7 +39,7 @@ built in parallel against it. Within a wave the files are disjoint.
 | follow-up | Interception operator console (React, own container) | Integrator, design skills, Chrome self-test | #20 |
 | fix | Issue #16 W4 review follow-ups | Integrator | #21 |
 | chore | Attribution setting; squash merges allowed | Integrator | #22 |
-| follow-up | Per-scenario explanations and build-your-own (open) | Integrator | #23 |
+| follow-up | Per-scenario explanations and build-your-own | Integrator | #23 |
 
 From #19 onward PRs were squash-merged (the human's choice, recorded under DR-7 in
 `evidence/decisions.md`); each PR's individual commits remain visible on GitHub.
@@ -73,25 +73,33 @@ Verbatim excerpt from the W4 launch prompt (this stream):
 
 ### Human interventions
 
-What the human steered, rejected or set up. Each row is the human's own account, confirmed
-2026-10-15; the last column shows where the outcome is visible, not proof of who asked.
+Each row is the human's own account (2026-10-15). The last column shows where the outcome is
+visible, not proof of who asked.
 
-| Human intervention | Why | Outcome visible in |
+**Corrections.** Agent output the human rejected or corrected, in the §12 format.
+
+| Stream | Prompt (short) | Agent output | What was wrong | How caught | Fix | Commit |
+|---|---|---|---|---|---|---|
+| Setup | Plan the build | The first implementation plans | Too vague to run agents against | Human read of the plan | The repo was made AI-ready before any product code: `AGENTS.md` as the single source of truth, a plan-review hook, a path-guard hook, mandatory rules and invariants, and `PLAN.md` waves so streams run in parallel and are verified by agent-driven TDD. Practices imported from the human's production work (`docs/ai-toolchain.md` §1, §5) | `b501b17` |
+| Selection | Pick a project for the brief | Round-1 multi-agent winner | Too generic; many candidates would build it | Human read of the scoring | A second scoring round; the Agent Action Firewall won it | `b501b17` (`docs/design-history/`) |
+| Release | Make the project runnable by the panel | A local-Python run path | The interviewer runs it on a different machine, which may not have Python 3.12 | Human review of the README run path | Docker-first run path with compose, and a CI job that proves the walkthrough | `ec7250f` (#18) |
+| Release | Run it end to end | An API-only service | `docker compose up` showed nothing a person could look at; no frontend | Human ran the stack | Interception operator console in its own container (DR-8) | `bee3a25` (#20) |
+| Console | Use the console as a panellist | Generic reason-code meanings per scenario | Did not say why this scenario was denied, and there was no way to try your own | Human used the console | Per-scenario explanations and a build-your-own scenario; the human chose a scripted, editable agent over adding an LLM | `8e90d3b` (#23) |
+| Git | Commit and open PRs | Commits and PRs with a Claude co-author trailer and footer | AI usage belongs in the PR body, not in authorship | Human review of the history | Trailer and footer rule removed | `19754ec` (#19) |
+
+**Harness set-up.** How the human set the agents up to be checked, not trusted.
+
+| Human decision | Why | Outcome visible in |
 |---|---|---|
-| Rejected the agent's first plans as too vague and made the repo AI-ready before any product code: `AGENTS.md` as the single source of truth, a plan-review hook, a path-guard hook, mandatory rules and invariants, and `PLAN.md` waves so streams could run in parallel and be verified by agent-driven TDD | Vague plans give agents room to drift; the human imported the practices already used on production work | `b501b17` (bootstrap, 35 hook self-tests); `docs/ai-toolchain.md` §1, §5 |
-| Rejected the round-1 solution as too generic, forcing a second multi-agent scoring round | Wanted a distinctive, bank-relevant problem | `docs/design-history/2026-10-15-solution-selection.md` |
-| Set Codex up as a separate, cross-vendor PR reviewer | Models from one family share blind spots; Codex caught P0s Claude missed (table below) | Codex threads on PRs #1–#12; `docs/ai-toolchain.md` §1 |
-| Had an independent corpus-author agent write the acceptance traces from the spec alone, then reviewed and placed them (the hook blocks agents from the corpus) | Tests written by the code's author share its assumptions; humans own acceptance | #12; DR-7. The two authors agreed on 35 of 36 traces at first contact |
-| Ran the build as parallel subagent streams in isolated worktrees against a frozen contract | Speed without merge conflicts; each stream proves itself red-to-green | `PLAN.md` waves; #3–#10 |
-| Required a fresh-context `code-reviewer` before every PR (`/ship-phase`) and a `red-team-reviewer` agent | A reviewer without the author's context finds what the author rationalised | `.claude/agents/`, `.claude/commands/`; PR threads |
-| Enforced guardrails instead of trusting instructions: permission deny list (force-push, `reset --hard`, rebase, amend, `--no-verify`, `.env`), CODEOWNERS, the `main` ruleset, a hash-locked corpus in CI | Any one layer can be bypassed; together they are hard to get past | `.claude/settings.json`, `.github/`, `tests/` corpus integrity check |
-| Mandated process skills and docs lookup: `superpowers` TDD, systematic debugging, verification-before-completion; `context7` for library APIs | Stops guessing at causes and signatures | `AGENTS.md` §13 |
-| Required every claim to be verified through one `scripts/verify.py` shared by local runs and CI | A check not run in the session is not reported as passed | `AGENTS.md` §3, §4 step 6 |
-| Delegated push, PR and merge to the integrator by removing the ask-before-push list | Keep the human on decisions, not on button presses | #2; DR-7 |
-| Asked for a Docker run path | The interviewer runs it on a different machine, without Python 3.12 | #18 |
-| Asked for a frontend, since none existed; later asked for a per-scenario explanation of each denial and a build-your-own scenario, choosing a scripted, editable agent over adding an LLM | `docker compose up` showed nothing a person could look at; the core path stays offline | #20, DR-8; #23 (open) |
-| Had Claude self-test the frontend in the browser, with backend unit and e2e tests automated | UI correctness needs eyes on the rendered page | #20: Chrome review in dark and light led to panel, highlight and line-routing fixes; #23 (open): Build your own goes Denied to Allowed after adding a trusted payee |
-| Stopped Claude co-author trailers on commits and PRs | AI usage is recorded in the PR body instead | #19 |
+| Codex as a separate, cross-vendor PR reviewer | Models from one family share blind spots; Codex caught P0s Claude missed (next table) | Codex threads on PRs #1–#12; `docs/ai-toolchain.md` §1 |
+| An independent corpus-author agent wrote the acceptance traces from the spec alone; the human reviewed and placed them (the hook blocks agents from the corpus) | Tests written by the code's author share its assumptions; humans own acceptance | #12; DR-7. The two authors agreed on 35 of 36 traces at first contact |
+| Parallel subagent streams in isolated worktrees against a frozen contract | Speed without merge conflicts; each stream proves itself red to green | `PLAN.md` waves; #3–#10 |
+| A fresh-context `code-reviewer` before every PR (`/ship-phase`) and a `red-team-reviewer` agent | A reviewer without the author's context finds what the author rationalised | `.claude/agents/`, `.claude/commands/`; PR threads |
+| Guardrails instead of trust: permission deny list (force-push, `reset --hard`, rebase, amend, `--no-verify`, `.env`), CODEOWNERS, the `main` ruleset, a hash-locked corpus in CI | Any one layer can be bypassed; together they are hard to get past | `.claude/settings.json`, `.github/`, the corpus integrity test |
+| Process skills and docs lookup: `superpowers` TDD, systematic debugging, verification-before-completion; `context7` for library APIs | Stops guessing at causes and signatures | `AGENTS.md` §13 |
+| Every claim verified through one `scripts/verify.py` shared by local runs and CI | A check not run in the session is not reported as passed | `AGENTS.md` §3, §4 step 6 |
+| Push, PR and merge delegated to the integrator by removing the ask-before-push list | Keep the human on decisions, not on button presses | #2; DR-7 |
+| Claude self-tests the frontend in Chrome; backend unit and e2e tests stay automated | UI correctness needs eyes on the rendered page | #20: Chrome review in dark and light led to panel, highlight and line-routing fixes; #23: Build your own goes Denied to Allowed after adding a trusted payee |
 | Final human sense check of the running product, including edge cases | The human is accountable for what is submitted | Human's own review |
 
 ### Caught by agents, hooks and reviewers
