@@ -49,6 +49,25 @@ describe("ConsoleView", () => {
     expect(screen.getAllByTestId("provenance-mark").length).toBeGreaterThan(0);
   });
 
+  it("drops a reply that arrives after the operator switched scenario", async () => {
+    let release: (r: Response) => void = () => {};
+    const pending = new Promise<Response>((resolve) => {
+      release = resolve;
+    });
+    mockFetch({
+      "/api/health": () => json(200, { status: "ok", policy_sha256: "97c469da" }),
+      "/api/v1/evaluate": () => pending,
+    });
+    render(<ConsoleView />);
+
+    await userEvent.click(await screen.findByRole("button", { name: "Evaluate call" }));
+    await userEvent.click(screen.getByRole("button", { name: /Rent to a saved payee/ }));
+    release(new Response(JSON.stringify(DENY), { status: 200 }));
+    await new Promise((r) => setTimeout(r, 20));
+
+    expect(screen.queryByTestId("verdict")).not.toBeInTheDocument();
+  });
+
   it("explains fail-closed when the policy is not loaded", async () => {
     mockFetch({
       "/api/health": () => json(503, { status: "degraded", reason: "policy_unloaded" }),
