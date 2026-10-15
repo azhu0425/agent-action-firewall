@@ -1,0 +1,32 @@
+# Agent Action Firewall policy. Policy changes are code changes: they go through a PR and the
+# policy-diff CI job (AGENTS.md §9). Do not add a `sha256` key: load_policy computes it from
+# these bytes and stamps it on every audit record.
+version: "2026-10-15"
+# enforce blocks; shadow returns ALLOW but records what enforce would have done.
+mode: enforce
+
+roles:
+  customer_assistant:
+    allowed_tools: [get_account_summary, transfer_funds, send_email]
+    # Amounts in AUD. Above the soft cap a human approves; above the hard cap the agent may
+    # never move money, whoever approves.
+    soft_cap_aud: 1000
+    hard_cap_aud: 5000
+  support_agent:
+    # Support staff help with contact details but never move money, so both caps are zero.
+    allowed_tools: [get_account_summary, send_email, update_contact_details]
+    soft_cap_aud: 0
+    hard_cap_aud: 0
+
+# Tools whose arguments are checked for provenance: each can move money or data out of the bank.
+high_risk_tools: [transfer_funds, send_email, update_contact_details]
+
+# Arguments that route money or messages. If their value was copied from untrusted content
+# (tool output, retrieved documents) that is the prompt-injection signature.
+taint_fields: [bsb, account_number, to, email, phone]
+
+# Email to these domains stays inside the bank, so it is not PII egress.
+bank_email_domains: [bank.example.com]
+
+# Shorter values (e.g. "yes", "100") appear in benign text too often to count as copied.
+min_taint_length: 6
