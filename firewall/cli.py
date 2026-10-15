@@ -69,6 +69,10 @@ def _replay(traces_path: Path, policy_path: Path) -> int:
         # json.JSONDecodeError messages quote a position, never the document.
         print(f"LOAD ERROR {type(exc).__name__}: {exc}", file=sys.stderr)
         return 2
+    if not traces:
+        # "0/0 traces met expectations" would pass vacuously.
+        print("LOAD ERROR no traces in file", file=sys.stderr)
+        return 2
     print(f"{'id':<12} {'expected':<44} {'actual':<44} ok")
     mismatches = 0
     for trace in traces:
@@ -100,6 +104,7 @@ def _verify_audit(log: Path) -> int:
 
 
 def _demo(policy_path: Path, *, with_firewall: bool, without_firewall: bool) -> int:
+    exit_code = 0
     if without_firewall:
         print("== without firewall ==")
         print(format_report(run_demo(None)))
@@ -109,13 +114,15 @@ def _demo(policy_path: Path, *, with_firewall: bool, without_firewall: bool) -> 
             policy = load_policy(policy_path)
         except PolicyError as exc:
             # Fail closed: the engine denies every call with POLICY_UNLOADED.
+            # The demo still runs to show the DENY, but the exit code reports the load failure.
             print(f"WARNING {exc}", file=sys.stderr)
             policy = None
+            exit_code = 2
         if without_firewall:
             print()
         print("== with firewall ==")
         print(format_report(run_demo(lambda request: evaluate(request, policy))))
-    return 0
+    return exit_code
 
 
 def main(argv: Sequence[str] | None = None) -> int:

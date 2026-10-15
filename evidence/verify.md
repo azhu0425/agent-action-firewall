@@ -9,7 +9,7 @@ Results below were run on 2026-10-15 in the W4 worktree, with main (including W3
 | Lint | `ruff check .` | PASS |
 | Format | `ruff format --check .` | PASS |
 | Types | `mypy` (strict, `firewall/`) | PASS |
-| Tests + coverage | `pytest --cov=firewall --cov-fail-under=80` | PASS: 386 tests, 99% branch coverage |
+| Tests + coverage | `pytest --cov=firewall --cov-fail-under=80` | PASS: 391 tests, 99% branch coverage |
 | Hook self-tests | `python -m unittest discover -s .claude/hooks` | PASS: 35 tests |
 | Eval gate | `python eval/run_eval.py --gate` | PASS: 20 attack, 16 benign; attack block rate 1.0, benign false-deny rate 0.0, expectation match 1.0 |
 | Mutation | `python eval/run_eval.py --mutation` | PASS: all 6 rules killed (removing any one lets an attack verdict get less severe) |
