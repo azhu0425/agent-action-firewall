@@ -37,8 +37,12 @@ export function ConsoleView() {
   // The request the shown decision was made for, so the evidence never drifts from the verdict.
   const [evaluated, setEvaluated] = useState<EvalRequest | null>(null);
   const sessionRef = useRef<HTMLDivElement>(null);
+  // Each evaluation and scenario change bumps this; a reply for an older number is discarded,
+  // so a verdict can never be shown beside a session it was not made for.
+  const generation = useRef(0);
 
   function choose(next: Scenario) {
+    generation.current += 1;
     setScenario(next);
     setRequest(next.request);
     setEditing(false);
@@ -72,9 +76,11 @@ export function ConsoleView() {
       setRequest(body);
     }
     setDraftError(null);
+    const mine = ++generation.current;
     setOutcome({ kind: "loading" });
     setEvaluated(body);
-    setOutcome(await evaluate(body));
+    const result = await evaluate(body);
+    if (mine === generation.current) setOutcome(result);
   }
 
   const decision = outcome.kind === "ok" ? outcome.value : null;
