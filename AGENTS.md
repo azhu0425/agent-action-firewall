@@ -173,9 +173,9 @@ Comments are for the reviewer six months from now. **Explain why. The code alrea
 - `main` is protected. Work on `w<n>/<stream>` (a `PLAN.md` stream) or `fix/<slug>`. No direct pushes after the
   bootstrap commit.
 - **Commits** follow Conventional Commits: `type(scope): imperative subject` of 72 characters or
-  fewer. The body says *why* and what was verified. Keep red and green commits separate. Commits
-  with substantial AI-generated content carry a `Co-authored-by:` trailer for the agent, so the
-  AI contribution can be audited from `git log`.
+  fewer. The body says *why* and what was verified. Keep red and green commits separate. Do not
+  add a `Co-authored-by:` trailer or a "Generated with" footer for the agent to commits or PRs;
+  AI usage is recorded in the PR description's AI-usage section instead.
 - **Merging** uses a merge commit only: `gh pr merge <n> --merge --delete-branch`. **Never squash
   or rebase-merge.** The exercise brief requires the incremental history to stay intact. Never
   force-push, amend or rebase pushed commits, rewrite history, or use `--no-verify`.

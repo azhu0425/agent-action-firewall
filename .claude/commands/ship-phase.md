@@ -30,8 +30,8 @@ Dispatch the `code-reviewer` subagent with this prompt: "Static review of
 - Keep the findings list for the PR comment.
 
 ## 4. Commit and push
-- Stage explicit paths only (no `git add -A` or `git add .`). Use Conventional Commits, and
-  include a `Co-authored-by:` trailer when the agent wrote the content.
+- Stage explicit paths only (no `git add -A` or `git add .`). Use Conventional Commits, with no
+  `Co-authored-by:` trailer for the agent (AGENTS.md §8).
 - `git push -u origin HEAD`. The settings ask the human here.
 
 ## 5. Open the PR
