@@ -31,7 +31,7 @@ except that PowerShell users type `curl.exe` instead of `curl`.
 git clone https://github.com/azhu0425/agent-action-firewall.git
 cd agent-action-firewall
 
-docker compose up --build -d                 # 1. build and start the API on :8000
+docker compose up --build -d                 # 1. build and start: console http://localhost:3000, API :8000
 docker compose run --rm verify               # 2. full strict check suite (what CI runs): RESULT: PASS
 docker compose run --rm demo                 # 3. injected $9,800: moves without the firewall, DENY with it
 
@@ -55,7 +55,14 @@ FIREWALL_POLICY_PATH=/app/policy/missing.yaml docker compose up -d --force-recre
 # restore:    unset FIREWALL_POLICY_PATH (PowerShell: Remove-Item Env:FIREWALL_POLICY_PATH); docker compose up -d --force-recreate firewall
 ```
 
-Clean up with `docker compose down -v`. Interactive API docs: <http://localhost:8000/docs>.
+**Open the console at <http://localhost:3000>.** Pick a scenario and press **Evaluate call**: the
+firewall's decision appears with its reasons, and for injected values a line traces each flagged
+argument back to the email or tool output it came from. **Audit trail** shows the hash-chained,
+value-free records; **Corpus** replays all 36 acceptance traces live. In fail-closed mode the
+console shows why every call is denied. The raw API docs are at <http://localhost:8000/docs>.
+
+Clean up with `docker compose down -v`. Both ports are bound to this machine only: the console and
+`GET /v1/audit` have no authentication (local demo, DR-8).
 
 ### Option B: local Python
 

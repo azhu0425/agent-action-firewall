@@ -156,3 +156,23 @@ def chain_head(log: Path) -> tuple[int, str]:
             raise AuditError(f"audit chain is broken at record {index}")
         head = current
     return len(lines), head
+
+
+def read_records(log: Path) -> list[dict[str, object]]:
+    """Parse every record for display, oldest first; a missing log is an empty one.
+
+    Records are value-free by construction (argument values are stored only as args_sha256), so
+    they are safe to return to a caller. Unparseable lines are skipped here: verify_chain is the
+    integrity check, this is only a reader. Raises AuditError if the log exists but is unreadable.
+    """
+    if not log.exists():
+        return []
+    records: list[dict[str, object]] = []
+    for line in _read_lines(log):
+        try:
+            parsed = json.loads(line)
+        except ValueError:
+            continue
+        if isinstance(parsed, dict):
+            records.append(parsed)
+    return records

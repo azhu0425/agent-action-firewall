@@ -27,3 +27,22 @@ jobs:
         run: uv sync --all-extras --locked
       - name: Verify
         run: uv run --locked python scripts/verify.py --strict
+
+  web:
+    # Interception console: typecheck, lint, unit tests and production build. Separate from
+    # verify.py because npm ci needs the network and verify stays offline (DR-8).
+    name: web
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: web
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+      - name: Install (locked)
+        run: npm ci --include=optional --no-audit --no-fund
+      - name: Typecheck, lint, test, build
+        run: npm run check

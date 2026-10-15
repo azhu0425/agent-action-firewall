@@ -13,11 +13,12 @@ import time
 from collections.abc import AsyncIterator, Callable
 from contextlib import asynccontextmanager
 from pathlib import Path
+from typing import Annotated
 
-from fastapi import FastAPI, Request
-from fastapi.responses import JSONResponse
+from fastapi import FastAPI, Query, Request
+from fastapi.responses import JSONResponse, RedirectResponse
 
-from firewall.audit import append_audit
+from firewall.audit import append_audit, chain_head, read_records, verify_chain
 from firewall.config import Settings, ShadowModeRefused, assert_mode_allowed, get_settings
 from firewall.engine import evaluate
 from firewall.errors import AuditError, PolicyError
@@ -46,6 +47,31 @@ def _startup_policy(settings: Settings, policy_loader: PolicyLoader) -> Policy |
     return policy
 
 
+_TEXT_FIELDS = ("ts", "request_id", "tool", "agent_role")
+_VERDICTS = frozenset(v.value for v in Verdict)
+
+
+def _public_record(record: dict[str, object]) -> dict[str, object]:
+    """Fields the console shows, each type-checked: a record can be tampered with after it was
+    written, so anything malformed becomes None rather than reaching the caller (the chain
+    status already reports the tampering). args_sha256 is cut to 8 hex chars: the full hash of
+    low-entropy arguments (BSB, account, amount) is brute-forceable (decisions.md DR-3)."""
+    public: dict[str, object] = {
+        key: value if isinstance(value := record.get(key), str) else None for key in _TEXT_FIELDS
+    }
+    verdict = record.get("verdict")
+    public["verdict"] = verdict if isinstance(verdict, str) and verdict in _VERDICTS else None
+    reasons = record.get("reasons")
+    public["reasons"] = (
+        reasons if isinstance(reasons, list) and all(isinstance(r, str) for r in reasons) else None
+    )
+    shadow = record.get("shadow")
+    public["shadow"] = shadow if isinstance(shadow, bool) else None
+    args_hash = record.get("args_sha256")
+    public["args_sha256"] = args_hash[:8] if isinstance(args_hash, str) else None
+    return public
+
+
 def create_app(
     settings: Settings | None = None,
     *,
@@ -70,6 +96,11 @@ def create_app(
     install_request_id(app)
     install_error_handlers(app)
 
+    # API-only service: send a browser that opens the base URL to the interactive docs.
+    @app.get("/", include_in_schema=False)
+    def root() -> RedirectResponse:
+        return RedirectResponse("/docs")
+
     @app.get("/health")
     def health(request: Request) -> JSONResponse:
         policy: Policy | None = request.app.state.policy
@@ -78,6 +109,43 @@ def create_app(
                 status_code=503, content={"status": "degraded", "reason": "policy_unloaded"}
             )
         return JSONResponse(content={"status": "ok", "policy_sha256": policy.sha256})
+
+    # Read-only view for the local operator console. No auth: it is a local demo, bound to
+    # 127.0.0.1 in compose (operate.md). Production would put this behind SSO + RBAC.
+    @app.get("/v1/audit")
+    def audit_trail(
+        request: Request, limit: Annotated[int, Query(ge=1, le=200)] = 50
+    ) -> JSONResponse:
+        log: Path = request.app.state.settings.audit_log
+        try:
+            with audit_lock:
+                first_bad = verify_chain(log) if log.exists() else None
+                count, head = chain_head(log) if log.exists() and first_bad is None else (0, None)
+                records = read_records(log)
+        except AuditError:
+            logger.error(
+                "audit read failed",
+                extra={
+                    "request_id": request.state.request_id,
+                    "fields": {"error_type": "AuditError"},
+                },
+            )
+            return JSONResponse(
+                status_code=500,
+                content={"error": "audit_unavailable", "request_id": request.state.request_id},
+            )
+        newest = [_public_record(r) for r in reversed(records[-limit:])]
+        return JSONResponse(
+            content={
+                "records": newest,
+                "chain": {
+                    "ok": first_bad is None,
+                    "count": count if first_bad is None else len(records),
+                    "head": head if first_bad is None else None,
+                    "first_bad": first_bad,
+                },
+            }
+        )
 
     @app.post("/v1/evaluate")
     def evaluate_call(body: EvalRequest, request: Request) -> Decision:

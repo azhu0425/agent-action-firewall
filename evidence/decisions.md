@@ -122,12 +122,28 @@
 - **Synthetic data.** All BSBs use the `000` prefix. `062-000`, used early on, is a live CBA
   branch. Codex caught it; every Claude agent had missed it.
 
+## DR-8: A React operator console in its own container
+
+- **Context.** The service is an API. Interviewers opening `docker compose up` saw nothing, and
+  the core insight (where a tainted value came from) is hard to see in raw JSON.
+- **Decision.** A Vite + React + TypeScript console (`web/`) served by unprivileged nginx, which
+  also proxies `/api` to the firewall, so the browser has one origin and the API needs no CORS.
+  New runtime dependencies: react, react-dom, motion, @phosphor-icons/react, zod, @fontsource
+  (self-hosted fonts). One new read-only API endpoint, `GET /v1/audit`, returns value-free
+  records with `args_sha256` cut to 8 hex characters (DR-3) and chain status.
+- **Verification.** The web image cannot build unless typecheck, lint, unit tests and the
+  production build pass. Web checks run in their own CI job rather than in `scripts/verify.py`,
+  because `npm ci` needs the network and verify stays offline (AGENTS.md §2.5).
+- **Limits.** Local demo with no authentication: both ports are bound to 127.0.0.1. Production
+  would put the console behind SSO with role-based access, and would not expose the audit trail
+  to every operator.
+
 ## Not built (deliberately)
 
 | Not built | Why |
 |---|---|
 | A real LLM agent on the core path | Needs keys, is non-deterministic, and is unnecessary to test the boundary (DR-5). Stretch S3 records local-model traces offline |
-| UI | The brief needs no UI. The operator console is stretch S2 |
+| Console authentication | Local demo only, bound to 127.0.0.1 (DR-8) |
 | Database, auth, multi-tenancy | Stateless evaluation is enough for the slice. Production shape is in `operate.md` |
 | Policy hot reload | A policy change is a deploy (PR, CI replays the corpus, revert to roll back) |
 | OPA/Rego, rate limiting, an ML injection classifier | Scope (DR-2, DR-4) |

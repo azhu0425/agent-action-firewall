@@ -37,3 +37,7 @@ Thumbs.db
 
 # Per-stream worktrees (claude --worktree)
 .claude/worktrees/
+
+# Web console
+node_modules/
+web/dist/
