@@ -117,8 +117,9 @@
     run.
 - **Delegation.** The human chose to delegate push, PR and merge to the integrator agent, and
   removed the ask-before-push list. The main-branch ruleset still requires a PR, a green
-  `verify` and resolved review threads, and allows merge commits only. Squash and rebase are
-  disabled, so the history stays intact.
+  `verify` and resolved review threads, and allows squash merges only, so each PR lands on
+  `main` as one commit. The red→green sequence stays visible in the PR's own commit list.
+  The human switched from merge commits to squash on 2026-10-15.
 - **Synthetic data.** All BSBs use the `000` prefix. `062-000`, used early on, is a live CBA
   branch. Codex caught it; every Claude agent had missed it.
 
