@@ -64,8 +64,8 @@ def install_request_id(app: FastAPI) -> None:
 def adopt_request_id(request: Request, request_id: str) -> None:
     """Make `request_id` the call's canonical id for the response header and for log lines."""
     request.state.request_id = request_id
-    # No reset needed: sync routes run in a copy of the context on the thread pool, so this set
-    # cannot outlive the request. An `async def` caller would need to reset it itself.
+    # No reset needed: this set cannot outlive the request. Sync routes run in a copied context
+    # on the thread pool, and RequestIdMiddleware's reset(token) restores the prior value anyway.
     request_id_var.set(request_id)
 
 
