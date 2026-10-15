@@ -66,6 +66,12 @@ jobs:
             sleep 2
           done
           docker compose logs firewall; exit 1
+      - name: Console serves and proxies the API
+        run: |
+          for _ in $(seq 1 30); do curl -fsS -o /dev/null localhost:3000/ && break; sleep 2; done
+          curl -fsS localhost:3000/ | grep -q '<div id="root">'
+          curl -fsS localhost:3000/api/health | grep -q '"status":"ok"'
+          curl -fsS 'localhost:3000/api/v1/audit?limit=1' | grep -q '"chain"'
       - name: Container runs as non-root
         run: test "$(docker compose exec -T firewall id -u)" != "0"
       - name: Full strict check suite inside the verify image

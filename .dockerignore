@@ -21,3 +21,5 @@ audit
 .claude/settings.local.json
 .claude/plans
 *exercise-brief*.md
+web/node_modules
+web/dist

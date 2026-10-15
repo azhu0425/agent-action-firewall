@@ -1,4 +1,4 @@
-# docker compose up --build -d         -> API on http://localhost:8000 (docs at /docs)
+# docker compose up --build -d         -> console on http://localhost:3000, API on :8000 (/docs)
 # docker compose run --rm firewall python -m firewall.cli demo
 # docker compose run --rm verify        -> full strict check suite, exactly what CI runs
 services:
@@ -8,12 +8,26 @@ services:
       target: runtime
     image: agent-action-firewall:local
     ports:
-      - "8000:8000"
+      # Local demo with no auth: bound to this machine only (evidence/operate.md).
+      - "127.0.0.1:8000:8000"
     environment:
       # Override to see fail-closed degraded mode, e.g. FIREWALL_POLICY_PATH=/app/policy/missing.yaml
       FIREWALL_POLICY_PATH: ${FIREWALL_POLICY_PATH:-/app/policy/policy.yaml}
     volumes:
       - audit:/app/audit
+
+  web:
+    # Interception console: http://localhost:3000 (nginx serves the SPA and proxies /api).
+    build:
+      context: .
+      dockerfile: web/Dockerfile
+    image: agent-action-firewall-web:local
+    ports:
+      - "127.0.0.1:3000:8080"
+    depends_on:
+      firewall:
+        # Started, not healthy: the console must come up in fail-closed mode too.
+        condition: service_started
 
   # One-shot tools (profile "tools"): docker compose run --rm <name>
   demo:

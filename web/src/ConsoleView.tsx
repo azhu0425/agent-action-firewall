@@ -91,7 +91,7 @@ export function ConsoleView() {
   return (
     <div className="flex flex-col gap-4">
       <StatusBanner health={health} />
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-[15.5rem_minmax(0,1fr)_minmax(19rem,23rem)]">
+      <div className="grid grid-cols-1 items-start gap-4 lg:grid-cols-[15.5rem_minmax(0,1fr)_minmax(19rem,23rem)]">
         <ScenarioRail current={scenario.id} onChoose={choose} />
 
         <section
@@ -103,7 +103,7 @@ export function ConsoleView() {
             <p className="mb-4 text-[13px] text-muted">What the agent saw, tagged by where it came from.</p>
             <ol className="flex flex-col gap-3">
               {shown.messages.map((message, index) => (
-                <li key={index} className="flex gap-3">
+                <li key={index} data-message={index} className="flex gap-3">
                   <span
                     className={`mt-0.5 inline-flex h-6 shrink-0 items-center gap-1.5 rounded-[var(--radius-control)] px-2 text-[13px] ${
                       message.source === "user" ? "bg-sunken text-ink" : "border border-dashed border-muted/60 text-muted"
@@ -147,9 +147,11 @@ export function ConsoleView() {
               <dl className="grid grid-cols-[minmax(7rem,auto)_1fr] gap-x-4 gap-y-1.5">
                 {Object.entries(shown.call.arguments).map(([name, value]) => (
                   <div key={name} data-arg-row={name} className="contents">
-                    <dt className="font-mono text-[13px] text-muted">{name}</dt>
+                    <dt data-arg-name={name} className="font-mono text-[13px] text-muted">
+                      {name}
+                    </dt>
                     <dd
-                      className={`font-mono text-[13px] ${
+                      className={`w-fit font-mono text-[13px] ${
                         taintedArgs.has(name) ? "rounded-sm bg-mark px-1 text-accent" : ""
                       }`}
                       data-arg-value={name}
@@ -258,19 +260,23 @@ function ProvenanceLines({
       const box = container.getBoundingClientRect();
       const next: { arg: string; d: string }[] = [];
       for (const arg of new Set(spans.map((s) => s.argument))) {
-        const value = container.querySelector(`[data-arg-value="${arg}"]`);
+        // From the argument's name, along the left gutter, to the message that held the value.
+        // Ending at the message edge keeps the line off the text; the exact span is highlighted.
+        const name = container.querySelector(`[data-arg-name="${arg}"]`);
         const mark = container.querySelector(`[data-mark-arg="${arg}"]`);
-        if (!value || !mark) continue;
-        const v = value.getBoundingClientRect();
+        const row = mark?.closest("[data-message]");
+        if (!name || !mark || !row) continue;
+        const n = name.getBoundingClientRect();
         const m = mark.getBoundingClientRect();
+        const r = row.getBoundingClientRect();
         const gutter = 14;
-        const vy = v.top + v.height / 2 - box.top;
+        const ny = n.top + n.height / 2 - box.top;
         const my = m.top + m.height / 2 - box.top;
-        const vx = v.left - box.left - 4;
-        const mx = m.left - box.left - 2;
+        const nx = n.left - box.left - 6;
+        const rx = r.left - box.left - 6;
         next.push({
           arg,
-          d: `M ${vx} ${vy} C ${gutter} ${vy}, ${gutter} ${vy}, ${gutter} ${vy - 12} L ${gutter} ${my + 12} C ${gutter} ${my}, ${gutter} ${my}, ${mx} ${my}`,
+          d: `M ${nx} ${ny} H ${gutter + 8} Q ${gutter} ${ny} ${gutter} ${ny - 8} V ${my + 8} Q ${gutter} ${my} ${gutter + 8} ${my} H ${rx}`,
         });
       }
       setPaths(next);
