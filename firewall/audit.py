@@ -84,6 +84,10 @@ def append_audit(log: Path, decision: Decision, request: EvalRequest, policy_sha
         raise AuditError("audit log could not be written") from exc
 
 
+def chain_head(log: Path) -> tuple[int, str]:
+    raise NotImplementedError("W1-C review fix")
+
+
 def verify_chain(log: Path) -> int | None:
     """Return the 0-based index of the first bad record, or None if the chain is intact.
 
