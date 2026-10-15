@@ -139,13 +139,17 @@ def test_amount_at_cap_is_allowed(policy: Policy, amount: ArgumentValue) -> None
 def test_amount_at_hard_cap_requires_approval_only(policy: Policy) -> None:
     result = rules.amount_limits(transfer(amount=5000), context(), policy)
 
-    assert result == [finding(Reason.AMOUNT_OVER_SOFT_CAP, Verdict.REQUIRE_HUMAN_APPROVAL, "amount")]
+    assert result == [
+        finding(Reason.AMOUNT_OVER_SOFT_CAP, Verdict.REQUIRE_HUMAN_APPROVAL, "amount")
+    ]
 
 
 def test_amount_above_soft_cap_requires_approval(policy: Policy) -> None:
     result = rules.amount_limits(transfer(amount=1000.01), context(), policy)
 
-    assert result == [finding(Reason.AMOUNT_OVER_SOFT_CAP, Verdict.REQUIRE_HUMAN_APPROVAL, "amount")]
+    assert result == [
+        finding(Reason.AMOUNT_OVER_SOFT_CAP, Verdict.REQUIRE_HUMAN_APPROVAL, "amount")
+    ]
 
 
 def test_amount_above_hard_cap_is_denied(policy: Policy) -> None:
