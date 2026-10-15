@@ -194,3 +194,11 @@ def test_policy_rejects_empty_taint_configuration(field: str) -> None:
 def test_decision_rejects_inconsistent_states(fields: dict[str, object]) -> None:
     with pytest.raises(ValidationError):
         Decision.model_validate({"request_id": "r1", **fields})
+
+
+def test_validation_errors_never_echo_submitted_values() -> None:
+    secret = "BSB 062-000 acct 99887766"
+    with pytest.raises(ValidationError) as excinfo:
+        request(customer_id=secret)
+
+    assert secret not in str(excinfo.value)
