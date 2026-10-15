@@ -20,6 +20,12 @@ _VALID_REQUEST_ID = re.compile(r"^[A-Za-z0-9._-]{1,64}$")
 # A loc segment can be a client-supplied dict key or unknown field name. Only identifier-shaped
 # segments (the same rule as models.Identifier) and list indexes are echoed back.
 _SAFE_LOC_SEGMENT = re.compile(r"^(?:[a-z][a-z0-9_]{0,63}|\[key\])$")
+_DEFAULT_CLIENT_MESSAGE = "invalid value"
+_CLIENT_MESSAGES: dict[str, str] = {
+    "missing": "field required",
+    "extra_forbidden": "unexpected field",
+    "json_invalid": "malformed JSON",
+}
 
 
 class RequestIdMiddleware:
@@ -73,9 +79,14 @@ def _safe_loc(loc: tuple[int | str, ...]) -> list[int | str]:
 async def _validation_error(request: Request, exc: Exception) -> JSONResponse:
     request_id = _request_id(request)
     errors = exc.errors() if isinstance(exc, RequestValidationError) else []
-    # Only loc/type/msg: `input` and `ctx` would echo what the client sent.
+    # Only loc/type and a fixed msg: `input`, `ctx` and pydantic's own msg (a validator can put
+    # the submitted value into it) would echo what the client sent.
     details = [
-        {"loc": _safe_loc(tuple(e.get("loc", ()))), "type": e.get("type"), "msg": e.get("msg")}
+        {
+            "loc": _safe_loc(tuple(e.get("loc", ()))),
+            "type": e.get("type"),
+            "msg": _CLIENT_MESSAGES.get(str(e.get("type")), _DEFAULT_CLIENT_MESSAGE),
+        }
         for e in errors
     ]
     logger.info(

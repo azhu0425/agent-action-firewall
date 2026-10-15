@@ -34,7 +34,7 @@ class Settings(BaseSettings):
     )
 
 
-def assert_mode_allowed(settings: Settings, mode: str) -> None:
+def assert_mode_allowed(settings: Settings, mode: Literal["enforce", "shadow"]) -> None:
     """Raise ShadowModeRefused if `mode` may not run in this environment.
 
     Shadow mode ALLOWs everything, so in prod it needs an explicit, separate opt-in.
