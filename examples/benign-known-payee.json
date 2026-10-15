@@ -1,0 +1,12 @@
+{
+  "request_id": "demo-benign",
+  "agent_role": "customer_assistant",
+  "customer_id": "cust-001",
+  "known_payees": ["000-200 20304050"],
+  "messages": [
+    {"source": "user", "content": "Pay my landlord $50 from my saved payees"}
+  ],
+  "call": {"tool": "transfer_funds",
+           "arguments": {"bsb": "000-200", "account_number": "20304050", "amount": 50,
+                         "payee_name": "Landlord"}}
+}
