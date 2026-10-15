@@ -2,6 +2,7 @@ import {
   CodeIcon,
   EnvelopeIcon,
   FileTextIcon,
+  FlaskIcon,
   PlayIcon,
   RobotIcon,
   UserIcon,
@@ -10,6 +11,7 @@ import {
 import { motion, useReducedMotion } from "motion/react";
 import { useLayoutEffect, useMemo, useRef, useState, type ReactNode, type RefObject } from "react";
 import { evaluate, type Result } from "./api";
+import { CUSTOM_START, CustomBuilder } from "./CustomBuilder";
 import { REASON_TEXT, SOURCE_LABEL, VERDICT_LABEL, VERDICT_TEXT } from "./labels";
 import { taintedSpans, type TaintedSpan } from "./provenance";
 import { SCENARIOS, type Scenario } from "./scenarios";
@@ -28,7 +30,8 @@ const SOURCE_ICON: Record<string, ReactNode> = {
 
 export function ConsoleView() {
   const { health } = useHealth();
-  const [scenario, setScenario] = useState<Scenario>(SCENARIOS[0]!);
+  // null while the operator is building their own scenario.
+  const [scenario, setScenario] = useState<Scenario | null>(SCENARIOS[0]!);
   const [request, setRequest] = useState<EvalRequest>(SCENARIOS[0]!.request);
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState("");
@@ -41,14 +44,30 @@ export function ConsoleView() {
   // so a verdict can never be shown beside a session it was not made for.
   const generation = useRef(0);
 
-  function choose(next: Scenario) {
+  function choose(next: Scenario | null) {
+    load(next, next?.request ?? CUSTOM_START);
+  }
+
+  function load(next: Scenario | null, nextRequest: EvalRequest) {
     generation.current += 1;
     setScenario(next);
-    setRequest(next.request);
+    setRequest(nextRequest);
     setEditing(false);
     setDraftError(null);
     setOutcome({ kind: "idle" });
     setEvaluated(null);
+  }
+
+  // A proposal is applied only if nothing (scenario change, evaluation, newer read) happened
+  // since the agent started reading, the same stale-reply rule as run().
+  function startProposal() {
+    const mine = ++generation.current;
+    // Bumping the generation orphans any evaluation in flight; clear its spinner so Evaluate is
+    // usable again even if this read then fails.
+    setOutcome((current) => (current.kind === "loading" ? { kind: "idle" } : current));
+    return (next: EvalRequest) => {
+      if (mine === generation.current) load(null, next);
+    };
   }
 
   // Validates the editor's JSON; on success it becomes the request, on failure the editor stays
@@ -105,115 +124,160 @@ export function ConsoleView() {
     return taintedSpans(shown.messages, shown.call.arguments, tainted);
   }, [decision, shown]);
   const taintedArgs = new Set(spans.map((s) => s.argument));
+  const edited =
+    scenario !== null && evaluated !== null && JSON.stringify(evaluated) !== JSON.stringify(scenario.request);
+  const explanation =
+    scenario !== null && decision !== null && !edited && matchesScenario(decision, scenario)
+      ? scenario.explanation
+      : null;
 
   return (
     <div className="flex flex-col gap-4">
       <StatusBanner health={health} />
       <div className="grid grid-cols-1 items-start gap-4 lg:grid-cols-[15.5rem_minmax(0,1fr)_minmax(19rem,23rem)]">
-        <ScenarioRail current={scenario.id} onChoose={choose} />
+        <ScenarioRail current={scenario?.id ?? null} onChoose={choose} />
 
-        <section
-          aria-label="Agent session"
-          className="relative rounded-[var(--radius-panel)] border border-line bg-surface"
-        >
-          <div ref={sessionRef} className="relative px-5 py-4 pl-9">
-            <h2 className="text-[18px] font-bold">Session</h2>
-            <p className="mb-4 text-[13px] text-muted">What the agent saw, tagged by where it came from.</p>
-            <ol className="flex flex-col gap-3">
-              {shown.messages.map((message, index) => (
-                <li key={index} data-message={index} className="flex gap-3">
-                  <span
-                    className={`mt-0.5 inline-flex h-6 shrink-0 items-center gap-1.5 rounded-[var(--radius-control)] px-2 text-[13px] ${
-                      message.source === "user" ? "bg-sunken text-ink" : "border border-dashed border-muted/60 text-muted"
-                    }`}
-                  >
-                    {SOURCE_ICON[message.source]}
-                    {SOURCE_LABEL[message.source]}
-                  </span>
-                  <p className="min-w-0 whitespace-pre-wrap break-words">
-                    {renderWithMarks(message.content, spans.filter((s) => s.messageIndex === index))}
-                  </p>
-                </li>
-              ))}
-            </ol>
-
-            <h2 className="mt-6 text-[18px] font-bold">Proposed call</h2>
-            <p className="mb-3 text-[13px] text-muted">
-              What the agent wants to do next: <code className="font-mono text-ink">{shown.call.tool}</code>{" "}
-              as <code className="font-mono text-ink">{shown.agent_role}</code>.
-            </p>
-            {editing ? (
-              <div className="flex flex-col gap-2">
-                <label htmlFor="request-json" className="text-[13px] font-medium">
-                  Request JSON
-                </label>
-                <textarea
-                  id="request-json"
-                  value={draft}
-                  onChange={(e) => setDraft(e.target.value)}
-                  spellCheck={false}
-                  rows={18}
-                  className="w-full rounded-[var(--radius-control)] border border-line bg-sunken p-3 font-mono text-[13px] leading-relaxed text-ink"
-                />
-                {draftError && (
-                  <p role="alert" className="text-[13px] text-deny">
-                    {draftError}
-                  </p>
-                )}
-              </div>
-            ) : (
-              <dl className="grid grid-cols-[minmax(7rem,auto)_1fr] gap-x-4 gap-y-1.5">
-                {Object.entries(shown.call.arguments).map(([name, value]) => (
-                  <div key={name} data-arg-row={name} className="contents">
-                    <dt data-arg-name={name} className="font-mono text-[13px] text-muted">
-                      {name}
-                    </dt>
-                    <dd
-                      className={`w-fit font-mono text-[13px] ${
-                        taintedArgs.has(name) ? "rounded-sm bg-mark px-1 text-accent" : ""
+        <div className="flex min-w-0 flex-col gap-4">
+          {scenario === null && <CustomBuilder startProposal={startProposal} />}
+          <section
+            aria-label="Agent session"
+            className="relative rounded-[var(--radius-panel)] border border-line bg-surface"
+          >
+            <div ref={sessionRef} className="relative px-5 py-4 pl-9">
+              <h2 className="text-[18px] font-bold">Session</h2>
+              <p className="mb-4 text-[13px] text-muted">What the agent saw, tagged by where it came from.</p>
+              <ol className="flex flex-col gap-3">
+                {shown.messages.map((message, index) => (
+                  <li key={index} data-message={index} className="flex gap-3">
+                    <span
+                      className={`mt-0.5 inline-flex h-6 shrink-0 items-center gap-1.5 rounded-[var(--radius-control)] px-2 text-[13px] ${
+                        message.source === "user" ? "bg-sunken text-ink" : "border border-dashed border-muted/60 text-muted"
                       }`}
-                      data-arg-value={name}
                     >
-                      {JSON.stringify(value)}
-                    </dd>
-                  </div>
+                      {SOURCE_ICON[message.source]}
+                      {SOURCE_LABEL[message.source]}
+                    </span>
+                    <p className="min-w-0 whitespace-pre-wrap break-words">
+                      {renderWithMarks(message.content, spans.filter((s) => s.messageIndex === index))}
+                    </p>
+                  </li>
                 ))}
-              </dl>
-            )}
-            <ProvenanceLines containerRef={sessionRef} spans={spans} />
-          </div>
-          <div className="flex flex-wrap items-center gap-2 border-t border-line px-5 py-3">
-            <button
-              type="button"
-              onClick={() => void run()}
-              disabled={outcome.kind === "loading"}
-              className="inline-flex items-center gap-2 rounded-[var(--radius-control)] bg-accent px-4 py-2 font-medium text-accent-ink transition-transform active:scale-[0.98] disabled:opacity-60"
-            >
-              <PlayIcon size={16} weight="fill" aria-hidden />
-              Evaluate call
-            </button>
-            <button
-              type="button"
-              onClick={toggleEditor}
-              aria-pressed={editing}
-              className="inline-flex items-center gap-2 rounded-[var(--radius-control)] border border-line px-3 py-2 text-ink hover:bg-sunken"
-            >
-              <CodeIcon size={16} aria-hidden />
-              {editing ? "Done editing" : "Edit JSON"}
-            </button>
-          </div>
-        </section>
+              </ol>
 
-        <DecisionPanel outcome={outcome} request={shown} provenanceShown={spans.length > 0} />
+              <h2 className="mt-6 text-[18px] font-bold">Proposed call</h2>
+              <p className="mb-3 text-[13px] text-muted">
+                What the agent wants to do next: <code className="font-mono text-ink">{shown.call.tool}</code>{" "}
+                as <code className="font-mono text-ink">{shown.agent_role}</code>.
+              </p>
+              {editing ? (
+                <div className="flex flex-col gap-2">
+                  <label htmlFor="request-json" className="text-[13px] font-medium">
+                    Request JSON
+                  </label>
+                  <textarea
+                    id="request-json"
+                    value={draft}
+                    onChange={(e) => setDraft(e.target.value)}
+                    spellCheck={false}
+                    rows={18}
+                    className="w-full rounded-[var(--radius-control)] border border-line bg-sunken p-3 font-mono text-[13px] leading-relaxed text-ink"
+                  />
+                  {draftError && (
+                    <p role="alert" className="text-[13px] text-deny">
+                      {draftError}
+                    </p>
+                  )}
+                </div>
+              ) : (
+                <dl className="grid grid-cols-[minmax(7rem,auto)_1fr] gap-x-4 gap-y-1.5">
+                  {Object.entries(shown.call.arguments).map(([name, value]) => (
+                    <div key={name} data-arg-row={name} className="contents">
+                      <dt data-arg-name={name} className="font-mono text-[13px] text-muted">
+                        {name}
+                      </dt>
+                      <dd
+                        className={`w-fit font-mono text-[13px] ${
+                          taintedArgs.has(name) ? "rounded-sm bg-mark px-1 text-accent" : ""
+                        }`}
+                        data-arg-value={name}
+                      >
+                        {JSON.stringify(value)}
+                      </dd>
+                    </div>
+                  ))}
+                </dl>
+              )}
+              <ProvenanceLines containerRef={sessionRef} spans={spans} />
+            </div>
+            <div className="flex flex-wrap items-center gap-2 border-t border-line px-5 py-3">
+              <button
+                type="button"
+                onClick={() => void run()}
+                disabled={outcome.kind === "loading"}
+                className="inline-flex items-center gap-2 rounded-[var(--radius-control)] bg-accent px-4 py-2 font-medium text-accent-ink transition-transform active:scale-[0.98] disabled:opacity-60"
+              >
+                <PlayIcon size={16} weight="fill" aria-hidden />
+                Evaluate call
+              </button>
+              <button
+                type="button"
+                onClick={toggleEditor}
+                aria-pressed={editing}
+                className="inline-flex items-center gap-2 rounded-[var(--radius-control)] border border-line px-3 py-2 text-ink hover:bg-sunken"
+              >
+                <CodeIcon size={16} aria-hidden />
+                {editing ? "Done editing" : "Edit JSON"}
+              </button>
+            </div>
+          </section>
+        </div>
+
+        <DecisionPanel
+          outcome={outcome}
+          request={shown}
+          provenanceShown={spans.length > 0}
+          explanation={explanation}
+          edited={edited}
+        />
       </div>
     </div>
   );
 }
 
-function ScenarioRail({ current, onChoose }: { current: string; onChoose: (s: Scenario) => void }) {
+// The explanation describes one specific outcome, so it is shown only when the API returned
+// exactly that verdict and reason set; anything else gets the generic reason text alone.
+function matchesScenario(decision: Decision, scenario: Scenario): boolean {
+  if (decision.shadow || decision.verdict !== scenario.expected) return false;
+  const got = new Set(decision.reasons);
+  return got.size === scenario.expectedReasons.length && scenario.expectedReasons.every((r) => got.has(r));
+}
+
+function ScenarioRail({
+  current,
+  onChoose,
+}: {
+  current: string | null;
+  onChoose: (s: Scenario | null) => void;
+}) {
   return (
     <nav aria-label="Scenarios" className="flex flex-col gap-1">
       <h2 className="px-1 pb-1 text-[13px] font-medium text-muted">Scenarios</h2>
+      <button
+        type="button"
+        onClick={() => onChoose(null)}
+        aria-current={current === null ? "true" : undefined}
+        className={`mb-2 rounded-[var(--radius-control)] border px-3 py-2 text-left transition-colors ${
+          current === null ? "border-accent bg-surface" : "border-dashed border-line hover:bg-surface/60"
+        }`}
+      >
+        <span className="flex items-center gap-1.5 font-medium leading-snug">
+          <FlaskIcon size={16} aria-hidden />
+          Build your own
+        </span>
+        <span className="block text-[13px] leading-snug text-muted">
+          Write your own emails and payees, and see what the firewall does.
+        </span>
+      </button>
       {SCENARIOS.map((s) => {
         const active = s.id === current;
         return (
@@ -354,10 +418,14 @@ function DecisionPanel({
   outcome,
   request,
   provenanceShown,
+  explanation,
+  edited,
 }: {
   outcome: Outcome;
   request: EvalRequest;
   provenanceShown: boolean;
+  explanation: string | null;
+  edited: boolean;
 }) {
   const reduce = useReducedMotion();
   return (
@@ -418,6 +486,18 @@ function DecisionPanel({
             </p>
           )}
           <p className="text-[18px] leading-snug">{consequence(request, outcome.value)}</p>
+
+          {explanation && (
+            <div>
+              <h3 className="mb-2 text-[13px] font-medium text-muted">In plain terms</h3>
+              <p className="max-w-[65ch] text-[15px] leading-relaxed">{explanation}</p>
+            </div>
+          )}
+          {edited && (
+            <p className="text-[13px] text-muted">
+              Request edited: the reasons below describe this call, not the original scenario.
+            </p>
+          )}
 
           {outcome.value.reasons.length > 0 && (
             <div>

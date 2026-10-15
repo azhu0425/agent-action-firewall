@@ -73,3 +73,16 @@ export type AuditResponse = z.infer<typeof AuditResponseSchema>;
 export type AuditRecord = z.infer<typeof AuditRecordSchema>;
 export type Message = z.infer<typeof MessageSchema>;
 export type EvalRequest = z.infer<typeof EvalRequestSchema>;
+
+export const SimulateRequestSchema = z.object({
+  user_request: z.string().min(1),
+  inbox: z.array(z.string()),
+});
+
+export const SimulateResponseSchema = z.object({
+  messages: z.array(MessageSchema),
+  call: EvalRequestSchema.shape.call,
+});
+
+export type SimulateRequest = z.infer<typeof SimulateRequestSchema>;
+export type SimulateResponse = z.infer<typeof SimulateResponseSchema>;

@@ -1,4 +1,5 @@
-"""HTTP API: `GET /health` and `POST /v1/evaluate`.
+"""HTTP API: `GET /health`, `POST /v1/evaluate`, and the console helpers `GET /v1/audit` and
+`POST /v1/simulate`.
 
 Fails closed at every step: a policy that is missing, invalid or refused for this environment
 leaves the app degraded (every call DENY POLICY_UNLOADED), and a decision that cannot be audited
@@ -17,13 +18,15 @@ from typing import Annotated
 
 from fastapi import FastAPI, Query, Request
 from fastapi.responses import JSONResponse, RedirectResponse
+from pydantic import BaseModel, ConfigDict, Field, StringConstraints
 
 from firewall.audit import append_audit, chain_head, read_records, verify_chain
 from firewall.config import Settings, ShadowModeRefused, assert_mode_allowed, get_settings
+from firewall.demo import propose_call
 from firewall.engine import evaluate
 from firewall.errors import AuditError, PolicyError
 from firewall.http_errors import adopt_request_id, install_error_handlers, install_request_id
-from firewall.models import Decision, EvalRequest, Policy, Reason, Verdict
+from firewall.models import Decision, EvalRequest, Message, Policy, Reason, ToolCall, Verdict
 from firewall.observability import configure_logging
 from firewall.policy import load_policy
 
@@ -70,6 +73,24 @@ def _public_record(record: dict[str, object]) -> dict[str, object]:
     args_hash = record.get("args_sha256")
     public["args_sha256"] = args_hash[:8] if isinstance(args_hash, str) else None
     return public
+
+
+# Bounded so a pasted inbox cannot make the scripted agent scan megabytes of text.
+_SimText = Annotated[str, StringConstraints(max_length=5_000)]
+
+
+class SimulateRequest(BaseModel):
+    """What the console's Build-your-own form sends: the customer's words and the emails."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    user_request: Annotated[str, StringConstraints(min_length=1, max_length=2_000)]
+    inbox: list[_SimText] = Field(default_factory=list, max_length=10)
+
+
+class SimulateResponse(BaseModel):
+    messages: list[Message]
+    call: ToolCall
 
 
 def create_app(
@@ -146,6 +167,18 @@ def create_app(
                 },
             }
         )
+
+    # The scripted naive agent from firewall/demo.py, so the console can show an injected email
+    # turning into a proposed call without an LLM. It only proposes; nothing is evaluated or
+    # audited here, and the call still has to go through /v1/evaluate.
+    @app.post("/v1/simulate")
+    def simulate(body: SimulateRequest, request: Request) -> SimulateResponse:
+        messages, call = propose_call(body.user_request, body.inbox)
+        logger.info(
+            "simulated agent proposal",
+            extra={"request_id": request.state.request_id, "fields": {"tool": call.tool}},
+        )
+        return SimulateResponse(messages=messages, call=call)
 
     @app.post("/v1/evaluate")
     def evaluate_call(body: EvalRequest, request: Request) -> Decision:
