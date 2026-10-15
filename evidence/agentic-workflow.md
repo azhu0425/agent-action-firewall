@@ -29,8 +29,8 @@ built in parallel against it. Within a wave the files are disjoint.
 | W0b | Acceptance corpus, thresholds, hash lock | Corpus-author agent; human reviewed and placed it | #12 (merged before #9) |
 | fix | Replace real BSBs with the `000` prefix | Integrator, after Codex's finding | #11 |
 | docs | Decision records DR-2 to DR-7 | Integrator, collected from PR bodies | #13 |
-| W3 | API, CLI, end-to-end tests, enable eval/mutation | Integrator | <!-- TODO(W3): PR number --> |
-| W4 | Release pack: README, evidence, security CI, Dockerfile | Subagent (this stream) | <!-- TODO(W4): PR number --> |
+| W3 | API, CLI, end-to-end tests, enable eval/mutation | Integrator | #14 |
+| W4 | Release pack: README, evidence, security CI, Dockerfile | Subagent (this stream) | #15 |
 
 Deviation from `PLAN.md`: streams ran as integrator-launched subagents in worktrees, not as
 separate `claude --worktree` terminals, and Codex reviewed but did not take a stream.

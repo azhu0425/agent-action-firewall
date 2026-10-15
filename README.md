@@ -63,11 +63,35 @@ python -m firewall.cli replay eval/corpus/attack.jsonl
 python -m firewall.cli verify-audit audit/audit.jsonl
 ```
 
-<!-- TODO(W3): paste the real output of `python -m firewall.cli demo` here once firewall/cli.py lands. -->
+`python -m firewall.cli demo` (real output):
+
+```text
+== without firewall ==
+agent proposed: transfer_funds
+firewall: off
+balance: $12,000.00 -> $2,200.00
+money moved: $9,800.00
+
+== with firewall ==
+agent proposed: transfer_funds
+firewall: DENY (AMOUNT_OVER_HARD_CAP, NEW_PAYEE, TAINTED_ARGUMENT)
+balance: $12,000.00 -> $12,000.00
+money moved: none
+```
+
+Exit codes: 0 success, 1 a replay mismatch or a broken audit chain, 2 the input could not be
+loaded.
 
 ## Example
 
-Request (`POST /v1/evaluate`):
+```text
+$ curl -s localhost:8000/health
+{"status":"ok","policy_sha256":"97c469dadf01286e34b8c8ba47d5e56ed8cc19788addd0e84a088c3c582be0b5"}
+
+$ curl -s -X POST localhost:8000/v1/evaluate -H "Content-Type: application/json" -d @headline.json
+```
+
+`headline.json`:
 
 ```json
 {
@@ -85,7 +109,7 @@ Request (`POST /v1/evaluate`):
 }
 ```
 
-Decision (produced by `firewall.engine.evaluate` on this request with the shipped policy):
+Response (`200 OK`, body re-indented for reading; captured from `uvicorn firewall.api:app`):
 
 ```json
 {
@@ -104,10 +128,15 @@ Decision (produced by `firewall.engine.evaluate` on this request with the shippe
 }
 ```
 
-<!-- TODO(W3): replace with the transcript of `curl -X POST localhost:8000/v1/evaluate` once firewall/api.py lands. -->
+The same request produced this log line and audit record (no argument values in either):
 
-Findings name the argument, never its value. Neither the logs nor the audit log hold argument
-values or message content.
+```text
+{"ts": "2026-10-15T04:08:15.386370+00:00", "level": "INFO", "logger": "firewall.api", "message": "decision", "request_id": "demo-001", "tool": "transfer_funds", "verdict": "DENY", "reasons": ["AMOUNT_OVER_HARD_CAP", "NEW_PAYEE", "TAINTED_ARGUMENT"], "latency_ms": 1.626}
+{"agent_role":"customer_assistant","args_sha256":"bc49d439…","engine_version":"0.1.0","hash":"425854b5…","policy_sha256":"97c469da…","prev_hash":"0000…","reasons":["AMOUNT_OVER_HARD_CAP","NEW_PAYEE","TAINTED_ARGUMENT"],"request_id":"demo-001","shadow":false,"tool":"transfer_funds","ts":"2026-10-15T04:08:15.385842+00:00","verdict":"DENY","would_be":null}
+```
+
+`python -m firewall.cli verify-audit` on that log printed `OK 1 records, head 425854b5…`.
+Findings name the argument, never its value.
 
 ## Known limitations
 

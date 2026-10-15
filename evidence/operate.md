@@ -14,11 +14,17 @@ The container runs as a non-root user with `APP_ENV=prod`, and its `HEALTHCHECK`
 
 **Single writer.** Each audit log must have exactly one writing process: run one uvicorn worker
 per `FIREWALL_AUDIT_LOG` (no `--workers N` on a shared file). Two writers can fork the hash chain,
-because reading the last hash and appending are not atomic across processes. To scale out, give
-each replica its own log, or ship records to a single log service. A cross-process lock is on the
-"Not built" list (DR-3).
+because reading the last hash and appending are not atomic across processes; the API serialises
+appends only within its own process. To scale out, give each replica its own log, or ship records
+to a single log service. A cross-process lock is not built (DR-3).
 
-<!-- TODO(W3): confirm the /health body, status codes and CLI exit codes against firewall/api.py and firewall/cli.py. -->
+- `GET /health`: 200 `{"status": "ok", "policy_sha256": …}`, or 503
+  `{"status": "degraded", "reason": "policy_unloaded"}` when no policy is loaded or its mode is
+  refused in this environment.
+- `POST /v1/evaluate`: 200 with the `Decision`; 422 for a malformed request; 500 (generic, with
+  `request_id`) for an unhandled error.
+- CLI exit codes: 0 success, 1 a replay mismatch or a broken audit chain, 2 the input could not be
+  loaded.
 
 ## Logs and status
 
@@ -58,7 +64,7 @@ The firewall degrades to **deny**, never to allow. The full table is in `design.
 | Policy missing or invalid at startup | Every call DENY `POLICY_UNLOADED`; health degraded | Fix or revert the policy commit; redeploy |
 | A rule crashes on some input | That call DENY `EVALUATOR_ERROR` | Replay the request id locally to find the rule (DR-2) |
 | Malformed request | 422 with no echoed input | Fix the orchestrator's payload |
-| Audit append fails | <!-- TODO(W3): document the API's behaviour on AuditError --> | Check disk and the chain with `verify-audit` |
+| Audit append fails (disk, permissions, tampered tail) | That call DENY `EVALUATOR_ERROR`; the log line has `error_type: AuditError` | Check disk and the chain with `verify-audit` |
 | Firewall unreachable | Orchestrator must treat it as DENY (fail closed on the caller side) | Scale out or restore the service |
 
 ## Shadow to enforce

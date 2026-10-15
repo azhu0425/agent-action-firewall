@@ -28,11 +28,12 @@ decision and audit record. There is no database and no network call on the decis
    no NaN/Infinity). A parse failure is a 422 that echoes no input; the caller treats it as DENY.
 3. `evaluate` builds an `EvalContext`, runs every rule on deep copies of its inputs, and combines
    the findings: DENY > REQUIRE_HUMAN_APPROVAL > ALLOW, every reason returned.
-4. The decision is appended to the audit log with `args_sha256` in place of the arguments, then
-   returned with the request id. The JSON log line carries metadata only.
+4. The decision is appended to the audit log with `args_sha256` in place of the arguments, under a
+   lock that serialises the read-last-hash-then-append pair within the process. If the append
+   fails, the decision is replaced by DENY `EVALUATOR_ERROR`: an unaudited ALLOW never leaves the
+   firewall. The decision is returned (200) with the request id, and the JSON log line carries
+   metadata only.
 5. The orchestrator executes the call only on ALLOW.
-
-<!-- TODO(W3): confirm steps 2 and 4 against firewall/api.py (audit failure handling, status codes). -->
 
 ## Contract (frozen in W0a)
 
@@ -135,8 +136,8 @@ Every row has a test (AGENTS.md §5).
 | Unknown argument (`cc`, `bcc`), missing or malformed amount, BSB, account or `to` | DENY `INVALID_ARGUMENT`, in shadow mode too | `test_rules.py` |
 | Unknown request field, NaN/Infinity, oversized input, bad identifiers | 422 with no echoed input; treated as DENY by the caller | `test_contract.py`, `test_http_errors.py` |
 | Unhandled exception in the API | Generic 500 with `request_id`; no traceback in logs or body | `test_http_errors.py`, `test_observability.py` |
-| Audit log tail tampered with | Append refuses (`AuditError`); `verify_chain` returns the first bad index | `test_audit.py` |
-| Shadow mode requested in prod | Refused at startup unless `FIREWALL_ALLOW_SHADOW_IN_PROD=true` | `test_shadow_mode_refused_in_prod_without_override` |
+| Audit log tail tampered with, or the append fails | Append refuses (`AuditError`); the API returns DENY `EVALUATOR_ERROR`; `verify_chain` returns the first bad index | `test_audit.py`, `test_api.py` |
+| Shadow mode requested in prod | Refused at startup unless `FIREWALL_ALLOW_SHADOW_IN_PROD=true`: no policy loaded, health degraded, every call DENY | `test_shadow_mode_refused_in_prod_without_override`, `test_health_degraded_when_shadow_mode_refused_in_prod` |
 | Eval thresholds NaN, out of range or duplicated | Gate fails | `test_eval_gate.py` |
 
 ## Security and privacy
