@@ -30,8 +30,8 @@ Dispatch the `code-reviewer` subagent with this prompt: "Static review of
 - Keep the findings list for the PR comment.
 
 ## 4. Commit and push
-- Stage explicit paths only (no `git add -A` or `git add .`). Use Conventional Commits, and
-  include a `Co-authored-by:` trailer when the agent wrote the content.
+- Stage explicit paths only (no `git add -A` or `git add .`). Use Conventional Commits, with no
+  `Co-authored-by:` trailer for the agent (AGENTS.md §8).
 - `git push -u origin HEAD`. The settings ask the human here.
 
 ## 5. Open the PR
@@ -57,8 +57,8 @@ Read the review comments from the Claude action and the Codex reviewer
 Report the PR URL, the CI status and the review dispositions. If the human has delegated merging
 (AGENTS.md §10, DR-7), the integrator merges once the gates are green and the threads resolved.
 Otherwise, hand the merge command to the human:
-`gh pr merge <n> --merge --delete-branch`. **Never use `--squash`, `--rebase` or `--admin`.** The
-brief requires the history to stay intact.
+`gh pr merge <n> --squash --delete-branch`. **Never use `--merge`, `--rebase` or `--admin`**
+(AGENTS.md §8).
 
 Then draft rows for the `evidence/agentic-workflow.md` intervention log covering anything the
 human corrected during this stream, and ask the human to confirm them.

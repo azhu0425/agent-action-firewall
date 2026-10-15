@@ -113,7 +113,7 @@ clones without the secret still get green CI. The core path never needs a key.
 
 | QuackChat | Here | Why |
 |---|---|---|
-| Squash merge | **Merge commits only** | The brief forbids collapsing history, and red→green commits are evidence |
+| Squash merge | Squash merge | The human chose one commit per PR on `main`; red→green commits stay visible on each PR |
 | Personal `bypassPermissions` | Project `acceptEdits` plus a deny list | A regulated-enterprise posture: the repo, not the developer's machine, sets agent permissions |
 | No PR template or CODEOWNERS | Both | Team-scale review expectations, made explicit |
 | mypy configured but not in CI | `mypy --strict` in `verify` | A small codebase, so strictness is cheap |

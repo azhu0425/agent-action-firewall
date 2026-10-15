@@ -81,7 +81,7 @@ agents** per wave.
    `feat(<scope>): …`.
 4. Run `python scripts/verify.py` and get exit 0. Then `/ship-phase <stream-id>`: review subagent,
    PR, CI and AI review (wait at most 5 minutes for the review).
-5. The human merges with `gh pr merge <n> --merge --delete-branch`.
+5. The human merges with `gh pr merge <n> --squash --delete-branch`.
 6. Draft the intervention-log rows and have the human confirm them.
 
 ### Prompt templates
