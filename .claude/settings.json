@@ -30,15 +30,6 @@
       "Bash(gh run view:*)",
       "Bash(gh run list:*)"
     ],
-    "ask": [
-      "Bash(git push:*)",
-      "Bash(git tag:*)",
-      "Bash(gh pr merge:*)",
-      "Bash(gh repo:*)",
-      "Bash(gh release:*)",
-      "Bash(gh secret:*)",
-      "Bash(gh api:*)"
-    ],
     "deny": [
       "Read(./.env)",
       "Read(./.env.local)",

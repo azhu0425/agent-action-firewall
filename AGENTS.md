@@ -234,8 +234,8 @@ The panel assesses *how* agents were used. Capture it as you go, not at the end.
 
 **Repo-enforced** (anyone who clones this repo gets these):
 
-- `.claude/settings.json`: permission posture (`acceptEdits`, ask before push/merge, deny for
-  destructive git and `.env`) and hooks. The project settings take precedence over a
+- `.claude/settings.json`: permission posture (`acceptEdits`, deny for destructive git and `.env`;
+  the human removed the ask-before-push/merge list to delegate those to the integrator agent) and hooks. The project settings take precedence over a
   developer's personal settings.
 - Hooks: `protect_paths.py` (human-owned files) and `require_plan_review.py` (no leaving plan mode
   without `/review-plan`). Each has its own tests.

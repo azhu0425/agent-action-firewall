@@ -9,8 +9,8 @@ Claude Code specifics. Put shared rules in `AGENTS.md`, never here.
 ## Claude Code specifics
 
 - The project settings in `.claude/settings.json` override personal settings. They set the
-  permission mode to `acceptEdits`, require asking before `git push` or `gh pr merge`, and deny
-  destructive git and `.env` reads. If a hook or permission blocks you, report it and the reason.
+  permission mode to `acceptEdits` and deny destructive git (force-push, `reset --hard`, rebase,
+  amend, `--no-verify`) and `.env` reads. If a hook or permission blocks you, report it and the reason.
   Never try another route to the same effect.
 - Hooks:
   - `protect_paths.py` blocks writes to `.claude/protected-paths.txt` entries.

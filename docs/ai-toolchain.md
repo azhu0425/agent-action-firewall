@@ -27,7 +27,7 @@ practice came from.
 | Piece | Where | What it does |
 |---|---|---|
 | Agent rules | `AGENTS.md` + pointers | Invariants, TDD loop, comment rules, PR conventions |
-| Permission posture | `.claude/settings.json` | `acceptEdits`; asks before push/merge/tag; denies force-push, `reset --hard`, rebase, amend, `--no-verify`, `.env` reads. Project settings override a developer's personal mode (including `bypassPermissions`) |
+| Permission posture | `.claude/settings.json` | `acceptEdits`; denies force-push, `reset --hard`, rebase, amend, `--no-verify`, `.env` reads. Project settings override a developer's personal mode (including `bypassPermissions`) |
 | Path guard hook | `.claude/hooks/protect_paths.py` | Fail-closed block on agent writes to `.claude/protected-paths.txt` entries. Has its own tests |
 | Plan review hook | `.claude/hooks/require_plan_review.py` | Can't leave plan mode until `/review-plan` has run. Has its own tests |
 | `/review-plan` | `.claude/commands/` | Parallel architect, gatekeeper and test reviewers with P0–P2 findings |
