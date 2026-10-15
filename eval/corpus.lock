@@ -1,0 +1,5 @@
+{
+  "eval/corpus/attack.jsonl": "1d20e9b8132efe7c3a3c639626166200ac31bff12a7319c398b352a3962ad8f8",
+  "eval/corpus/benign.jsonl": "5dce1ac7fd8bec96e9f77fc9ee0be986a9b50600149343d6b99ad825617d3d10",
+  "eval/thresholds.yaml": "78ddb04c5f99efdcfd39a7959acbe37bb48f182819a9a9647122112d493cbebd"
+}
