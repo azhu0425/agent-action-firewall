@@ -74,6 +74,24 @@ describe("Build your own", () => {
     expect(evaluated[0]).toMatchObject({ known_payees: ["000-100 12345678"], call: PROPOSAL.call });
   });
 
+  it("drops a proposal that arrives after the operator picked a preset", async () => {
+    let release: (r: Response) => void = () => {};
+    const pending = new Promise<Response>((resolve) => {
+      release = resolve;
+    });
+    stubApi(() => pending);
+    render(<ConsoleView />);
+
+    await userEvent.click(await screen.findByRole("button", { name: /Build your own/ }));
+    await userEvent.click(screen.getByRole("button", { name: "Let the agent read these" }));
+    await userEvent.click(screen.getByRole("button", { name: /Rent to a saved payee/ }));
+    release(new Response(JSON.stringify(PROPOSAL), { status: 200 }));
+    await new Promise((r) => setTimeout(r, 20));
+
+    expect(screen.getByRole("button", { name: /Rent to a saved payee/ })).toHaveAttribute("aria-current", "true");
+    expect(screen.queryByRole("region", { name: "Build your own scenario" })).not.toBeInTheDocument();
+  });
+
   it("says so when the agent simulation cannot be reached, and evaluates nothing", async () => {
     const { evaluated } = stubApi(() => Promise.reject(new TypeError("offline")));
     render(<ConsoleView />);

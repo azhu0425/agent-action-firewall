@@ -15,7 +15,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from firewall.api import create_app
-from firewall.audit import append_audit, verify_chain
+from firewall.audit import append_audit, read_records, verify_chain
 from firewall.config import Settings
 from firewall.errors import AuditError
 from firewall.models import Decision, EvalRequest, Reason, Verdict
@@ -396,4 +396,23 @@ def test_simulate_writes_no_audit_record(tmp_path: Path) -> None:
     with TestClient(create_app(settings)) as client:
         client.post("/v1/simulate", json=body)
 
-    assert not settings.audit_log.exists()
+    assert read_records(settings.audit_log) == []
+
+
+@pytest.mark.parametrize(
+    "body",
+    [
+        {"user_request": "", "inbox": []},
+        {"user_request": "Summarise my latest emails", "inbox": [INJECTED_EMAIL + "x" * 5_000]},
+        {"user_request": "Summarise my latest emails", "inbox": [], "known_payees": [ACCOUNT]},
+    ],
+    ids=["empty-user-request", "email-over-5000-chars", "unknown-field"],
+)
+def test_simulate_rejects_out_of_bounds_input_without_echo(
+    tmp_path: Path, body: dict[str, Any]
+) -> None:
+    with TestClient(create_app(make_settings(tmp_path))) as client:
+        response = client.post("/v1/simulate", json=body)
+
+    assert response.status_code == 422
+    assert ACCOUNT not in response.text

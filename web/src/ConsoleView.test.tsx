@@ -172,6 +172,19 @@ describe("ConsoleView", () => {
     expect(screen.queryByText(SCENARIOS[0]!.explanation)).not.toBeInTheDocument();
   });
 
+  it("hides the explanation in shadow mode, where the call was allowed", async () => {
+    mockFetch({
+      "/api/health": () => json(200, { status: "ok", policy_sha256: "97c469da" }),
+      "/api/v1/evaluate": () => json(200, { ...DENY, verdict: "ALLOW", shadow: true, would_be: "DENY" }),
+    });
+    render(<ConsoleView />);
+
+    await userEvent.click(await screen.findByRole("button", { name: "Evaluate call" }));
+
+    expect(await screen.findByText(/shadow mode/i)).toBeInTheDocument();
+    expect(screen.queryByText(SCENARIOS[0]!.explanation)).not.toBeInTheDocument();
+  });
+
   it("keeps the explanation when the editor is opened and closed without changes", async () => {
     mockFetch({
       "/api/health": () => json(200, { status: "ok", policy_sha256: "97c469da" }),

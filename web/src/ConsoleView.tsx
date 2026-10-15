@@ -58,6 +58,15 @@ export function ConsoleView() {
     setEvaluated(null);
   }
 
+  // A proposal is applied only if nothing (scenario change, evaluation, newer read) happened
+  // since the agent started reading, the same stale-reply rule as run().
+  function startProposal() {
+    const mine = ++generation.current;
+    return (next: EvalRequest) => {
+      if (mine === generation.current) load(null, next);
+    };
+  }
+
   // Validates the editor's JSON; on success it becomes the request, on failure the editor stays
   // open with the reason, so an edit is never silently dropped.
   function applyDraft(): EvalRequest | null {
@@ -126,7 +135,7 @@ export function ConsoleView() {
         <ScenarioRail current={scenario?.id ?? null} onChoose={choose} />
 
         <div className="flex min-w-0 flex-col gap-4">
-          {scenario === null && <CustomBuilder onProposed={(next) => load(null, next)} />}
+          {scenario === null && <CustomBuilder startProposal={startProposal} />}
           <section
             aria-label="Agent session"
             className="relative rounded-[var(--radius-panel)] border border-line bg-surface"

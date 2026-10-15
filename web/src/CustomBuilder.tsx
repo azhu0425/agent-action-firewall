@@ -24,6 +24,10 @@ interface Payee {
 
 const FIELD =
   "w-full rounded-[var(--radius-control)] border border-line bg-sunken px-2.5 py-1.5 text-[15px] text-ink";
+const MAX_EMAILS = 10; // the API's SimulateRequest bounds
+const MAX_EMAIL_CHARS = 5_000;
+const MAX_REQUEST_CHARS = 2_000;
+
 const QUIET_BUTTON =
   "inline-flex items-center gap-1.5 rounded-[var(--radius-control)] border border-line px-2.5 py-1.5 text-[13px] text-ink hover:bg-sunken";
 
@@ -32,7 +36,13 @@ const QUIET_BUTTON =
  * proposes a call; no LLM is involved. The result replaces the console's request, so it is
  * shown, editable and evaluated exactly like a preset.
  */
-export function CustomBuilder({ onProposed }: { onProposed: (request: EvalRequest) => void }) {
+export function CustomBuilder({
+  startProposal,
+}: {
+  // Called when the agent starts reading; the returned function applies the proposal, and does
+  // nothing if the operator moved on (another scenario, or a newer read) before it arrived.
+  startProposal: () => (request: EvalRequest) => void;
+}) {
   const [role, setRole] = useState("customer_assistant");
   const [payees, setPayees] = useState<Payee[]>([]);
   const [userRequest, setUserRequest] = useState("Summarise my latest emails");
@@ -45,6 +55,7 @@ export function CustomBuilder({ onProposed }: { onProposed: (request: EvalReques
   }
 
   async function readEmails() {
+    const apply = startProposal();
     setBusy(true);
     setProblem(null);
     const result = await simulate({
@@ -64,7 +75,7 @@ export function CustomBuilder({ onProposed }: { onProposed: (request: EvalReques
       setProblem(`The agent simulation returned an unexpected response (HTTP ${result.status}).`);
       return;
     }
-    onProposed({
+    apply({
       agent_role: role,
       customer_id: CUSTOMER_ID,
       known_payees: payees
@@ -78,6 +89,7 @@ export function CustomBuilder({ onProposed }: { onProposed: (request: EvalReques
   return (
     <section
       aria-label="Build your own scenario"
+      aria-busy={busy}
       className="rounded-[var(--radius-panel)] border border-line bg-surface px-5 py-4"
     >
       <h2 className="text-[18px] font-bold">Build your own</h2>
@@ -97,7 +109,12 @@ export function CustomBuilder({ onProposed }: { onProposed: (request: EvalReques
         </label>
         <label className="flex flex-col gap-1 text-[13px] font-medium">
           What the customer asked
-          <input value={userRequest} onChange={(e) => setUserRequest(e.target.value)} className={FIELD} />
+          <input
+            value={userRequest}
+            maxLength={MAX_REQUEST_CHARS}
+            onChange={(e) => setUserRequest(e.target.value)}
+            className={FIELD}
+          />
         </label>
       </div>
 
@@ -152,6 +169,7 @@ export function CustomBuilder({ onProposed }: { onProposed: (request: EvalReques
               <textarea
                 aria-label={`Email ${index + 1}`}
                 value={email}
+                maxLength={MAX_EMAIL_CHARS}
                 rows={3}
                 onChange={(e) => setEmails((all) => all.map((m, i) => (i === index ? e.target.value : m)))}
                 className={`${FIELD} min-w-0 flex-1 whitespace-pre-wrap`}
@@ -167,7 +185,7 @@ export function CustomBuilder({ onProposed }: { onProposed: (request: EvalReques
             </li>
           ))}
         </ul>
-        {emails.length < 10 && (
+        {emails.length < MAX_EMAILS && (
           <button
             type="button"
             onClick={() => setEmails((all) => [...all, ""])}
@@ -187,7 +205,7 @@ export function CustomBuilder({ onProposed }: { onProposed: (request: EvalReques
           className="inline-flex items-center gap-2 rounded-[var(--radius-control)] bg-accent px-4 py-2 font-medium text-accent-ink transition-transform active:scale-[0.98] disabled:opacity-60"
         >
           <RobotIcon size={16} aria-hidden />
-          Let the agent read these
+          {busy ? "Reading…" : "Let the agent read these"}
         </button>
         <p className="text-[13px] text-muted">Changes apply when the agent reads them again.</p>
       </div>
