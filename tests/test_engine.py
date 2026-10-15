@@ -68,8 +68,15 @@ def shadow_policy(policy: Policy) -> Policy:
     return policy.model_copy(update={"mode": "shadow"})
 
 
-def test_evaluate_most_restrictive_decision_wins(policy: Policy) -> None:
-    decision = evaluate(make_request(), policy, rules=[finding_rule(HUMAN), finding_rule(DENY_CAP)])
+@pytest.mark.parametrize(
+    "ordered", [(HUMAN, DENY_CAP), (DENY_CAP, HUMAN)], ids=["human-first", "deny-first"]
+)
+def test_evaluate_most_restrictive_decision_wins(
+    policy: Policy, ordered: tuple[Finding, Finding]
+) -> None:
+    rules = [finding_rule(ordered[0]), finding_rule(ordered[1])]
+
+    decision = evaluate(make_request(), policy, rules=rules)
 
     assert decision.verdict is Verdict.DENY
 
@@ -156,6 +163,80 @@ def test_evaluate_echoes_given_request_id(policy: Policy) -> None:
     decision = evaluate(make_request(request_id="req-42"), policy, rules=[no_findings])
 
     assert decision.request_id == "req-42"
+
+
+def test_evaluate_empty_rule_set_denies_no_rules(policy: Policy) -> None:
+    decision = evaluate(make_request(), policy, rules=[])
+
+    assert decision.verdict is Verdict.DENY
+    assert decision.reasons == [Reason.NO_RULES]
+
+
+def test_shadow_mode_no_findings_reports_would_be_allow(shadow_policy: Policy) -> None:
+    decision = evaluate(make_request(), shadow_policy, rules=[no_findings])
+
+    assert decision.verdict is Verdict.ALLOW
+    assert decision.shadow is True
+    assert decision.would_be is Verdict.ALLOW
+    assert decision.reasons == []
+
+
+def test_evaluate_fired_rule_then_exception_drops_partial_findings(policy: Policy) -> None:
+    decision = evaluate(make_request(), policy, rules=[finding_rule(HUMAN), raising_rule])
+
+    assert decision.verdict is Verdict.DENY
+    assert decision.reasons == [Reason.EVALUATOR_ERROR]
+    assert decision.findings == []
+
+
+@pytest.mark.parametrize("reason", [Reason.NOT_ALLOWLISTED, Reason.INVALID_ARGUMENT])
+def test_shadow_mode_fail_closed_rule_reason_still_denies(
+    shadow_policy: Policy, reason: Reason
+) -> None:
+    fail_closed = Finding(reason=reason, verdict=Verdict.DENY)
+
+    decision = evaluate(
+        make_request(), shadow_policy, rules=[finding_rule(SOFT_CAP), finding_rule(fail_closed)]
+    )
+
+    assert decision.verdict is Verdict.DENY
+    assert reason in decision.reasons
+
+
+@pytest.mark.parametrize(
+    "bad",
+    [
+        Finding(reason=Reason.EVALUATOR_ERROR, verdict=Verdict.DENY),
+        Finding(reason=Reason.POLICY_UNLOADED, verdict=Verdict.DENY),
+        Finding(reason=Reason.NEW_PAYEE, verdict=Verdict.ALLOW),
+    ],
+    ids=["engine-reason-evaluator", "engine-reason-unloaded", "allow-verdict"],
+)
+def test_evaluate_finding_breaking_rule_contract_denies_evaluator_error(
+    policy: Policy, bad: Finding
+) -> None:
+    decision = evaluate(make_request(), policy, rules=[finding_rule(bad)])
+
+    assert decision.verdict is Verdict.DENY
+    assert decision.reasons == [Reason.EVALUATOR_ERROR]
+
+
+def test_evaluate_rule_mutation_not_visible_to_next_rule(policy: Policy) -> None:
+    seen: list[int] = []
+
+    def mutating_rule(call: ToolCall, context: EvalContext, policy: Policy) -> list[Finding]:
+        context.messages.append(context.messages[0])
+        policy.roles.clear()
+        return []
+
+    def observing_rule(call: ToolCall, context: EvalContext, policy: Policy) -> list[Finding]:
+        seen.append(len(context.messages))
+        seen.append(len(policy.roles))
+        return []
+
+    evaluate(make_request(), policy, rules=[mutating_rule, observing_rule])
+
+    assert seen == [1, 2]
 
 
 def test_evaluate_stamps_policy_sha256(policy: Policy) -> None:
