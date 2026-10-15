@@ -43,7 +43,7 @@
       "Bash(git commit --no-verify:*)",
       "Bash(git clean:*)",
       "Bash(git filter-branch:*)",
-      "Bash(gh pr merge --squash:*)",
+      "Bash(gh pr merge --merge:*)",
       "Bash(gh pr merge --rebase:*)",
       "Bash(gh pr merge --admin:*)"
     ]
