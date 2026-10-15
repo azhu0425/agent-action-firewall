@@ -7,6 +7,7 @@ import uuid
 from collections.abc import Sequence
 
 from firewall.models import (
+    RULE_REASONS,
     VERDICT_SEVERITY,
     Decision,
     EvalContext,
@@ -20,9 +21,16 @@ from firewall.rules import DEFAULT_RULES, Rule
 
 logger = logging.getLogger(__name__)
 
+# Unknown tool and malformed input are fail-closed cases (AGENTS.md §2.1), so shadow mode never
+# relaxes them; it relaxes only the policy judgements (caps, new payee, PII egress, taint).
+SHADOW_NEVER_RELAXES: frozenset[Reason] = frozenset(
+    {Reason.NOT_ALLOWLISTED, Reason.INVALID_ARGUMENT}
+)
+
 
 class RuleContractError(TypeError):
-    """A rule returned something other than a list of Finding objects."""
+    """A rule returned something other than a list of DENY/REQUIRE_HUMAN_APPROVAL Findings
+    carrying rule reasons."""
 
 
 def _rule_name(rule: Rule) -> str:
@@ -42,9 +50,18 @@ def _deny(request_id: str, reason: Reason, policy: Policy | None) -> Decision:
 def _run_rule(
     rule: Rule, request: EvalRequest, context: EvalContext, policy: Policy
 ) -> list[Finding]:
-    result = rule(request.call, context, policy)
-    # Checked explicitly: Decision would coerce dicts into Findings and hide a broken rule.
-    if not isinstance(result, list) or not all(isinstance(f, Finding) for f in result):
+    # Each rule gets its own deep copies: a rule mutating shared state must not steer the next.
+    result = rule(
+        request.call.model_copy(deep=True),
+        context.model_copy(deep=True),
+        policy.model_copy(deep=True),
+    )
+    # Checked explicitly: Decision would coerce dicts into Findings and hide a broken rule. An
+    # ALLOW finding or an engine-only reason (e.g. EVALUATOR_ERROR) is also a contract breach.
+    if not isinstance(result, list) or not all(
+        isinstance(f, Finding) and f.reason in RULE_REASONS and f.verdict is not Verdict.ALLOW
+        for f in result
+    ):
         raise RuleContractError
     return result
 
@@ -55,7 +72,11 @@ def evaluate(
     """Evaluate one proposed tool call. Never raises for rule errors and never ALLOWs on one.
 
     No policy -> DENY POLICY_UNLOADED; no rules -> DENY NO_RULES; any rule raising or breaking
-    its return contract -> DENY EVALUATOR_ERROR, in enforce and shadow mode alike.
+    its return contract -> DENY EVALUATOR_ERROR, in enforce and shadow mode alike. Shadow mode
+    returns ALLOW with `would_be` set, except that NOT_ALLOWLISTED or INVALID_ARGUMENT still DENY.
+
+    Only `Exception` is converted. BaseException subclasses (KeyboardInterrupt, SystemExit)
+    propagate, so callers (API, CLI) must map any unhandled exception to DENY / HTTP 500.
     """
     request_id = request.request_id or uuid.uuid4().hex
     if policy is None:
@@ -83,7 +104,7 @@ def evaluate(
         )
         reasons = list(dict.fromkeys(f.reason for f in findings))
         sha = policy.sha256 or None
-        if policy.mode == "shadow":
+        if policy.mode == "shadow" and SHADOW_NEVER_RELAXES.isdisjoint(reasons):
             return Decision(
                 request_id=request_id,
                 verdict=Verdict.ALLOW,
@@ -93,6 +114,8 @@ def evaluate(
                 would_be=verdict,
                 policy_sha256=sha,
             )
+        if policy.mode == "shadow":
+            verdict = Verdict.DENY
         return Decision(
             request_id=request_id,
             verdict=verdict,
