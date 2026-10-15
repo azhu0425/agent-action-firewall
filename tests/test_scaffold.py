@@ -34,7 +34,27 @@ def test_verify_script_exits_nonzero_when_a_step_fails(capsys: pytest.CaptureFix
     code = verify.run_steps(steps, enabled=["passes", "fails"], strict=False)
 
     assert code != 0
-    assert "fails" in capsys.readouterr().out
+    assert "FAIL (3)" in capsys.readouterr().out
+
+
+def test_verify_marks_steps_after_a_failure_as_not_run(capsys: pytest.CaptureFixture[str]) -> None:
+    verify = load_verify()
+    steps = {
+        "fails": [sys.executable, "-c", "raise SystemExit(1)"],
+        "after": [sys.executable, "-c", "raise SystemExit(0)"],
+    }
+
+    verify.run_steps(steps, enabled=["fails", "after"], strict=False)
+
+    assert "NOT RUN" in capsys.readouterr().out
+
+
+def test_verify_rejects_enabled_step_that_is_not_declared() -> None:
+    verify = load_verify()
+    steps = {"passes": [sys.executable, "-c", "raise SystemExit(0)"]}
+
+    with pytest.raises(ValueError, match="pytests"):
+        verify.run_steps(steps, enabled=["passes", "pytests"], strict=False)
 
 
 def test_verify_reports_skipped_steps_and_fails_on_skip_when_strict(
