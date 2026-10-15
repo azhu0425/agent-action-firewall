@@ -92,6 +92,26 @@ describe("Build your own", () => {
     expect(screen.queryByRole("region", { name: "Build your own scenario" })).not.toBeInTheDocument();
   });
 
+  it("re-enables Evaluate when a failed read superseded an evaluation in flight", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn((input: RequestInfo | URL) => {
+        const url = String(input);
+        if (url.endsWith("/api/health")) return json(200, { status: "ok", policy_sha256: "97c469da" });
+        if (url.endsWith("/api/v1/simulate")) return Promise.reject(new TypeError("offline"));
+        return new Promise<Response>(() => {});
+      }),
+    );
+    render(<ConsoleView />);
+
+    await userEvent.click(await screen.findByRole("button", { name: /Build your own/ }));
+    await userEvent.click(screen.getByRole("button", { name: "Evaluate call" }));
+    await userEvent.click(screen.getByRole("button", { name: "Let the agent read these" }));
+    await screen.findByText(/agent simulation didn.t answer/i);
+
+    expect(screen.getByRole("button", { name: "Evaluate call" })).toBeEnabled();
+  });
+
   it("says so when the agent simulation cannot be reached, and evaluates nothing", async () => {
     const { evaluated } = stubApi(() => Promise.reject(new TypeError("offline")));
     render(<ConsoleView />);

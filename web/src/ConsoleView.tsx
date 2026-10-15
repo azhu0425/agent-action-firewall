@@ -62,6 +62,9 @@ export function ConsoleView() {
   // since the agent started reading, the same stale-reply rule as run().
   function startProposal() {
     const mine = ++generation.current;
+    // Bumping the generation orphans any evaluation in flight; clear its spinner so Evaluate is
+    // usable again even if this read then fails.
+    setOutcome((current) => (current.kind === "loading" ? { kind: "idle" } : current));
     return (next: EvalRequest) => {
       if (mine === generation.current) load(null, next);
     };
