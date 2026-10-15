@@ -103,3 +103,65 @@ def test_load_policy_shipped_policy_file_loads(repo_root: Path) -> None:
     assert result.mode == "enforce"
     assert set(result.roles) == {"customer_assistant", "support_agent"}
     assert len(result.sha256) == 64
+
+
+def test_load_policy_shipped_policy_matches_fixture(repo_root: Path, policy: Policy) -> None:
+    result = load_policy(repo_root / "policy" / "policy.yaml")
+
+    assert result.model_dump(exclude={"version", "sha256"}) == policy.model_dump(
+        exclude={"version", "sha256"}
+    )
+
+
+def test_load_policy_oversized_file_rejected(tmp_path: Path) -> None:
+    path = _write(tmp_path, VALID_YAML + "#" * 70_000 + "\n")
+
+    with pytest.raises(PolicyError):
+        load_policy(path)
+
+
+def test_load_policy_deep_nesting_raises_policy_error(tmp_path: Path) -> None:
+    path = _write(tmp_path, "version: " + "[" * 20_000 + "]" * 20_000 + "\n")
+
+    with pytest.raises(PolicyError):
+        load_policy(path)
+
+
+def test_load_policy_duplicate_key_rejected(tmp_path: Path) -> None:
+    path = _write(tmp_path, VALID_YAML + "mode: shadow\n")
+
+    with pytest.raises(PolicyError):
+        load_policy(path)
+
+
+def test_load_policy_yaml_error_has_no_marker_or_context(tmp_path: Path) -> None:
+    path = _write(tmp_path, f"roles: [{SECRET_MARKER}\n  : : :\n")
+
+    with pytest.raises(PolicyError) as excinfo:
+        load_policy(path)
+
+    assert SECRET_MARKER not in str(excinfo.value)
+    assert excinfo.value.__context__ is None
+
+
+def test_load_policy_validation_error_has_no_context(tmp_path: Path) -> None:
+    path = _write(tmp_path, VALID_YAML.replace('version: "t1"', f"version: [{SECRET_MARKER}]"))
+
+    with pytest.raises(PolicyError) as excinfo:
+        load_policy(path)
+
+    assert excinfo.value.__context__ is None
+
+
+def test_load_policy_empty_file_raises_policy_error(tmp_path: Path) -> None:
+    path = _write(tmp_path, "")
+
+    with pytest.raises(PolicyError):
+        load_policy(path)
+
+
+def test_load_policy_hard_cap_below_soft_cap_rejected(tmp_path: Path) -> None:
+    path = _write(tmp_path, VALID_YAML.replace("hard_cap_aud: 5000", "hard_cap_aud: 500"))
+
+    with pytest.raises(PolicyError):
+        load_policy(path)
