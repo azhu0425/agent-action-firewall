@@ -33,10 +33,6 @@ class RuleContractError(TypeError):
     carrying rule reasons."""
 
 
-def _rule_name(rule: Rule) -> str:
-    return getattr(rule, "__name__", type(rule).__name__)
-
-
 def _deny(request_id: str, reason: Reason, policy: Policy | None) -> Decision:
     # Fail-closed outcomes are never shadowed: an error must not become ALLOW (AGENTS.md §2.1).
     return Decision(
@@ -84,7 +80,6 @@ def evaluate(
     if not rules:
         return _deny(request_id, Reason.NO_RULES, policy)
 
-    stage = "engine"
     try:
         context = EvalContext(
             agent_role=request.agent_role,
@@ -94,9 +89,7 @@ def evaluate(
         )
         findings: list[Finding] = []
         for rule in rules:
-            stage = _rule_name(rule)
             findings.extend(_run_rule(rule, request, context, policy))
-        stage = "engine"
         verdict = max(
             (f.verdict for f in findings),
             key=VERDICT_SEVERITY.__getitem__,
@@ -123,10 +116,18 @@ def evaluate(
             findings=findings,
             policy_sha256=sha,
         )
-    except Exception as exc:
-        # Fail-closed boundary (AGENTS.md §6). Log the type only: messages may carry values (§2.2).
+    except Exception:
+        # Fail-closed boundary (AGENTS.md §6). Only the outcome is logged: the exception, its
+        # type and the rule name are outside the §2.2 allowlist and may carry values.
         logger.warning(
             "evaluator error",
-            extra={"request_id": request_id, "rule": stage, "error_type": type(exc).__name__},
+            extra={
+                "request_id": request_id,
+                "fields": {
+                    "tool": request.call.tool,
+                    "verdict": Verdict.DENY.value,
+                    "reasons": [Reason.EVALUATOR_ERROR.value],
+                },
+            },
         )
         return _deny(request_id, Reason.EVALUATOR_ERROR, policy)
