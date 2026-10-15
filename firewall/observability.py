@@ -16,7 +16,6 @@ ALLOWED_FIELDS: frozenset[str] = frozenset(
     {"tool", "verdict", "reasons", "latency_ms", "status", "path", "method", "error_type"}
 )
 
-_HANDLER_NAME = "firewall-json"
 # uvicorn installs its own handlers on these, and they print tracebacks with the exception
 # message (which may carry a value). They are stripped so every record goes through JsonFormatter.
 _THIRD_PARTY_LOGGERS = ("uvicorn", "uvicorn.error", "uvicorn.access")
@@ -44,20 +43,21 @@ class JsonFormatter(logging.Formatter):
 
 
 def configure_logging(level: str) -> None:
-    """Install the JSON handler on the root logger, replacing any earlier one we installed.
+    """Make the JSON handler the root logger's only handler.
 
-    uvicorn's loggers lose their own handlers and propagate to root instead. Call this after
-    uvicorn has applied its log config (i.e. at app startup), or pass `log_config=None` to it.
+    Every pre-existing root handler is removed: one left in place would print each record a
+    second time, with its own formatter, including exception text. uvicorn's loggers lose their
+    own handlers and propagate to root instead. Call this after uvicorn has applied its log
+    config (i.e. at app startup), or pass `log_config=None` to it.
     """
     for name in _THIRD_PARTY_LOGGERS:
         third_party = logging.getLogger(name)
         third_party.handlers.clear()
         third_party.propagate = True
     root = logging.getLogger()
-    for handler in [h for h in root.handlers if h.get_name() == _HANDLER_NAME]:
-        root.removeHandler(handler)
+    for existing in list(root.handlers):
+        root.removeHandler(existing)
     handler = logging.StreamHandler()
-    handler.set_name(_HANDLER_NAME)
     handler.setFormatter(JsonFormatter())
     root.addHandler(handler)
     root.setLevel(level)
