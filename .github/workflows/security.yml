@@ -49,7 +49,7 @@ jobs:
       - name: gitleaks (full history)
         run: >
           docker run --rm -v "$PWD:/repo" ghcr.io/gitleaks/gitleaks:v8.30.0
-          git /repo --redact --no-banner --exit-code 1
+          git /repo --redact --no-banner --verbose --exit-code 1
 
   container:
     runs-on: ubuntu-latest
