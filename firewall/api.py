@@ -47,13 +47,26 @@ def _startup_policy(settings: Settings, policy_loader: PolicyLoader) -> Policy |
     return policy
 
 
-_PUBLIC_RECORD_FIELDS = ("ts", "request_id", "tool", "agent_role", "verdict", "reasons", "shadow")
+_TEXT_FIELDS = ("ts", "request_id", "tool", "agent_role")
+_VERDICTS = frozenset(v.value for v in Verdict)
 
 
 def _public_record(record: dict[str, object]) -> dict[str, object]:
-    """Fields the console shows. args_sha256 is cut to 8 hex chars: the full hash of low-entropy
-    arguments (BSB, account, amount) is brute-forceable (decisions.md DR-3)."""
-    public = {key: record.get(key) for key in _PUBLIC_RECORD_FIELDS}
+    """Fields the console shows, each type-checked: a record can be tampered with after it was
+    written, so anything malformed becomes None rather than reaching the caller (the chain
+    status already reports the tampering). args_sha256 is cut to 8 hex chars: the full hash of
+    low-entropy arguments (BSB, account, amount) is brute-forceable (decisions.md DR-3)."""
+    public: dict[str, object] = {
+        key: value if isinstance(value := record.get(key), str) else None for key in _TEXT_FIELDS
+    }
+    verdict = record.get("verdict")
+    public["verdict"] = verdict if isinstance(verdict, str) and verdict in _VERDICTS else None
+    reasons = record.get("reasons")
+    public["reasons"] = (
+        reasons if isinstance(reasons, list) and all(isinstance(r, str) for r in reasons) else None
+    )
+    shadow = record.get("shadow")
+    public["shadow"] = shadow if isinstance(shadow, bool) else None
     args_hash = record.get("args_sha256")
     public["args_sha256"] = args_hash[:8] if isinstance(args_hash, str) else None
     return public

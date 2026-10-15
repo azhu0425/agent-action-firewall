@@ -51,31 +51,43 @@ export function ConsoleView() {
     setEvaluated(null);
   }
 
-  function toggleEditor() {
-    if (!editing) setDraft(JSON.stringify(request, null, 2));
+  // Validates the editor's JSON; on success it becomes the request, on failure the editor stays
+  // open with the reason, so an edit is never silently dropped.
+  function applyDraft(): EvalRequest | null {
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(draft);
+    } catch {
+      setDraftError("That isn't valid JSON. Check for a missing comma or quote.");
+      return null;
+    }
+    const checked = EvalRequestSchema.safeParse(parsed);
+    if (!checked.success) {
+      setDraftError("The JSON parses, but it isn't an evaluation request. Keep the scenario's fields.");
+      return null;
+    }
     setDraftError(null);
-    setEditing(!editing);
+    setRequest(checked.data);
+    return checked.data;
+  }
+
+  function toggleEditor() {
+    if (!editing) {
+      setDraft(JSON.stringify(request, null, 2));
+      setDraftError(null);
+      setEditing(true);
+      return;
+    }
+    if (applyDraft()) setEditing(false);
   }
 
   async function run() {
     let body = request;
     if (editing) {
-      let parsed: unknown;
-      try {
-        parsed = JSON.parse(draft);
-      } catch {
-        setDraftError("That isn't valid JSON. Check for a missing comma or quote.");
-        return;
-      }
-      const checked = EvalRequestSchema.safeParse(parsed);
-      if (!checked.success) {
-        setDraftError("The JSON parses, but it isn't an evaluation request. Keep the scenario's fields.");
-        return;
-      }
-      body = checked.data;
-      setRequest(body);
+      const applied = applyDraft();
+      if (!applied) return;
+      body = applied;
     }
-    setDraftError(null);
     const mine = ++generation.current;
     setOutcome({ kind: "loading" });
     setEvaluated(body);
