@@ -29,6 +29,12 @@ The source of truth is `firewall/models.py`, pinned by `tests/test_contract.py`.
 `{"request_id", "verdict": "ALLOW|REQUIRE_HUMAN_APPROVAL|DENY", "reasons": [...], "findings": [{"reason", "verdict", "argument"}], "shadow", "would_be", "policy_sha256"}`.
 Findings name the argument involved and never its value.
 
+**Trust boundary** (DR-1): `agent_role`, `customer_id` and `known_payees` come from the
+orchestrator that hosts the agent, never from model output. The untrusted inputs are `call`
+(proposed by the model) and every non-`user` message. Tool and argument names must be plain
+identifiers, and message content is capped at 20,000 characters. NaN and Infinity are rejected
+everywhere.
+
 **Message sources:** `user` is the only trusted source. `assistant`, `tool_output` and `retrieved`
 are untrusted.
 
@@ -51,6 +57,7 @@ are untrusted.
 | `NEW_PAYEE` | rule | REQUIRE_HUMAN_APPROVAL |
 | `PII_EGRESS` | rule | DENY |
 | `TAINTED_ARGUMENT` | rule | DENY |
+| `INVALID_ARGUMENT` | rule | DENY |
 | `POLICY_UNLOADED` | engine (fail-closed) | DENY |
 | `NO_RULES` | engine (fail-closed) | DENY |
 | `EVALUATOR_ERROR` | engine (fail-closed) | DENY |

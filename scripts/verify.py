@@ -36,6 +36,10 @@ ENABLED_STEPS: list[str] = ["ruff-check", "ruff-format", "mypy", "pytest", "hook
 
 def run_steps(steps: Mapping[str, Sequence[str]], enabled: Sequence[str], strict: bool) -> int:
     """Run enabled steps in declaration order; return a process exit code."""
+    unknown = sorted(set(enabled) - set(steps))
+    if unknown:
+        # A typo in ENABLED_STEPS must not quietly turn a gate into a skip.
+        raise ValueError(f"enabled steps not declared in STEPS: {', '.join(unknown)}")
     results: list[tuple[str, str, float]] = []
     exit_code = 0
     for name, command in steps.items():
