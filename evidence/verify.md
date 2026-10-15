@@ -47,8 +47,9 @@ exposed a wrong account-length bound in the rules, fixed test-first (`679eb6a` r
   Desktop 29.0.1 (Windows, Linux containers) and runs on every PR in the `container` CI job:
   compose up, strict verify inside the `verify` image, demo, the three example verdicts, audit
   chain, value-free logs, corpus replay, and fail-closed degraded mode.
-- GitHub Actions and tool versions are pinned by tag, not by commit SHA. Dependabot is configured
-  for security updates only. SHA pinning was deferred in the W0a review and is still open.
+- GitHub Actions are pinned by commit SHA and the gitleaks image by digest (issue #16). Python
+  tools run by exact version (`uvx bandit==…`). Dependabot is configured for security updates
+  only, so the pins move only when someone bumps them on purpose.
 - The Claude PR-review action is skipped while `CLAUDE_CODE_OAUTH_TOKEN` is unset. The
   `code-reviewer` subagent and Codex stand in for it.
 - The red-team pass (W4-A) and the README fresh-clone check (W3 checkpoint, W5) are later steps.
