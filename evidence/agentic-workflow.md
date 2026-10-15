@@ -12,6 +12,8 @@
 | **Claude review action** (`ai-review.yml`) | Configured, but skipped while `CLAUDE_CODE_OAUTH_TOKEN` is unset; the `code-reviewer` subagent stood in |
 | **Guardrails** | `protect_paths` hook (human-owned files), `require_plan_review` hook, permission deny list (force-push, `reset --hard`, rebase, amend, `--no-verify`, `.env`), CODEOWNERS, `main` ruleset |
 | **Skills / plugins** | `superpowers` (TDD, systematic debugging, verification-before-completion), `/review-plan`, `/ship-phase`, `context7` for library APIs |
+| **claude-in-chrome** | Claude drove the operator console in Chrome to self-test layout, flows and both themes |
+| **Design skills** | `design-taste-frontend`, `frontend-design`, `impeccable` guided the console build (#20) |
 
 Setup and rationale: `docs/ai-toolchain.md`.
 
@@ -31,6 +33,16 @@ built in parallel against it. Within a wave the files are disjoint.
 | docs | Decision records DR-2 to DR-7 | Integrator, collected from PR bodies | #13 |
 | W3 | API, CLI, end-to-end tests, enable eval/mutation | Integrator | #14 |
 | W4 | Release pack: README, evidence, security CI, Dockerfile | Subagent (this stream) | #15 |
+| docs | Step-by-step README run with example requests | Integrator | #17 |
+| follow-up | Docker-first run path with compose and a CI walkthrough | Integrator | #18 |
+| chore | Stop listing Claude as a co-author on commits and PRs | Integrator, at the human's request | #19 |
+| follow-up | Interception operator console (React, own container) | Integrator, design skills, Chrome self-test | #20 |
+| fix | Issue #16 W4 review follow-ups | Integrator | #21 |
+| chore | Attribution setting; squash merges allowed | Integrator | #22 |
+| follow-up | Per-scenario explanations and build-your-own (open) | Integrator | #23 |
+
+From #19 onward PRs were squash-merged (the human's choice, recorded under DR-7 in
+`evidence/decisions.md`); each PR's individual commits remain visible on GitHub.
 
 Deviation from `PLAN.md`: streams ran as integrator-launched subagents in worktrees, not as
 separate `claude --worktree` terminals, and Codex reviewed but did not take a stream.
@@ -59,7 +71,33 @@ Verbatim excerpt from the W4 launch prompt (this stream):
 
 ## Intervention log
 
-Rows are drafted by agents from PR threads and commit messages; the human confirms them (§12).
+### Human interventions
+
+What the human steered, rejected or set up. Each row is the human's own account, confirmed
+2026-10-15; the last column shows where the outcome is visible, not proof of who asked.
+
+| Human intervention | Why | Outcome visible in |
+|---|---|---|
+| Rejected the agent's first plans as too vague and made the repo AI-ready before any product code: `AGENTS.md` as the single source of truth, a plan-review hook, a path-guard hook, mandatory rules and invariants, and `PLAN.md` waves so streams could run in parallel and be verified by agent-driven TDD | Vague plans give agents room to drift; the human imported the practices already used on production work | `b501b17` (bootstrap, 35 hook self-tests); `docs/ai-toolchain.md` §1, §5 |
+| Rejected the round-1 solution as too generic, forcing a second multi-agent scoring round | Wanted a distinctive, bank-relevant problem | `docs/design-history/2026-10-15-solution-selection.md` |
+| Set Codex up as a separate, cross-vendor PR reviewer | Models from one family share blind spots; Codex caught P0s Claude missed (table below) | Codex threads on PRs #1–#12; `docs/ai-toolchain.md` §1 |
+| Had an independent corpus-author agent write the acceptance traces from the spec alone, then reviewed and placed them (the hook blocks agents from the corpus) | Tests written by the code's author share its assumptions; humans own acceptance | #12; DR-7. The two authors agreed on 35 of 36 traces at first contact |
+| Ran the build as parallel subagent streams in isolated worktrees against a frozen contract | Speed without merge conflicts; each stream proves itself red-to-green | `PLAN.md` waves; #3–#10 |
+| Required a fresh-context `code-reviewer` before every PR (`/ship-phase`) and a `red-team-reviewer` agent | A reviewer without the author's context finds what the author rationalised | `.claude/agents/`, `.claude/commands/`; PR threads |
+| Enforced guardrails instead of trusting instructions: permission deny list (force-push, `reset --hard`, rebase, amend, `--no-verify`, `.env`), CODEOWNERS, the `main` ruleset, a hash-locked corpus in CI | Any one layer can be bypassed; together they are hard to get past | `.claude/settings.json`, `.github/`, `tests/` corpus integrity check |
+| Mandated process skills and docs lookup: `superpowers` TDD, systematic debugging, verification-before-completion; `context7` for library APIs | Stops guessing at causes and signatures | `AGENTS.md` §13 |
+| Required every claim to be verified through one `scripts/verify.py` shared by local runs and CI | A check not run in the session is not reported as passed | `AGENTS.md` §3, §4 step 6 |
+| Delegated push, PR and merge to the integrator by removing the ask-before-push list | Keep the human on decisions, not on button presses | #2; DR-7 |
+| Asked for a Docker run path | The interviewer runs it on a different machine, without Python 3.12 | #18 |
+| Asked for a frontend, since none existed; later asked for a per-scenario explanation of each denial and a build-your-own scenario, choosing a scripted, editable agent over adding an LLM | `docker compose up` showed nothing a person could look at; the core path stays offline | #20, DR-8; #23 (open) |
+| Had Claude self-test the frontend in the browser, with backend unit and e2e tests automated | UI correctness needs eyes on the rendered page | #20: Chrome review in dark and light led to panel, highlight and line-routing fixes; #23 (open): Build your own goes Denied to Allowed after adding a trusted payee |
+| Stopped Claude co-author trailers on commits and PRs | AI usage is recorded in the PR body instead | #19 |
+| Final human sense check of the running product, including edge cases | The human is accountable for what is submitted | Human's own review |
+
+### Caught by agents, hooks and reviewers
+
+Agent output caught by a hook, test, reviewer agent, Codex, the integrator or the agent's own
+report. Drafted by agents from PR threads and commit messages; the human confirms them (§12).
 
 | Stream | Prompt (short) | Agent output | What was wrong | How caught | Fix | Commit |
 |---|---|---|---|---|---|---|
