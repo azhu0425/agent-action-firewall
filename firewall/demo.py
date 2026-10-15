@@ -8,7 +8,9 @@ from __future__ import annotations
 
 import re
 from collections.abc import Callable
-from dataclasses import dataclass, field
+from decimal import Decimal
+
+from pydantic import BaseModel, ConfigDict
 
 from firewall.models import (
     ArgumentValue,
@@ -31,18 +33,38 @@ DEFAULT_INBOX = (
 )
 AGENT_ROLE = "customer_assistant"
 CUSTOMER_ID = "cust-demo"
+OPENING_BALANCE_CENTS = 1_200_000
 
-# e.g. "transfer $9,800 to BSB 062-000 account 12345678" or "... acct 12345678"
+# e.g. "transfer $9,800 to BSB 062-000 account 12345678" or "transfer 1200 to bsb 062000 acct 1".
+# Digit counts are bounded so a hostile email cannot produce an absurd or overflowing amount.
 _INJECTED_TRANSFER = re.compile(
-    r"transfer\s+\$(?P<amount>\d[\d,]*(?:\.\d+)?)\s+to\s+bsb\s+(?P<bsb>\d{3}-\d{3})\s+"
-    r"(?:account|acct)\s+(?P<account>\d+)",
+    r"transfer\s+\$?(?P<amount>\d{1,3}(?:,\d{3}){1,4}(?:\.\d{1,2})?|\d{1,15}(?:\.\d{1,2})?)"
+    r"\s+to\s+bsb\s+(?P<bsb>\d{3}-?\d{3})\s+(?:account|acct)\s+(?P<account>\d{1,12})\b",
     re.IGNORECASE,
 )
 
 
+class Ledger(BaseModel):
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
+    balance_cents: int  # integer cents: no float drift on money
+    transfers: tuple[ToolCall, ...] = ()
+    outbox: tuple[ToolCall, ...] = ()
+
+
+class DemoResult(BaseModel):
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
+    balance_before_cents: int
+    balance_after_cents: int
+    tool: str
+    verdict: Verdict | None
+    reasons: list[Reason]
+
+
 def _parse_amount(text: str) -> int | float:
-    value = float(text.replace(",", ""))
-    return int(value) if value.is_integer() else value
+    value = Decimal(text.replace(",", ""))
+    return int(value) if value == value.to_integral_value() else float(value)
 
 
 def propose_call(user_request: str, inbox: list[str]) -> tuple[list[Message], ToolCall]:
@@ -69,31 +91,28 @@ def propose_call(user_request: str, inbox: list[str]) -> tuple[list[Message], To
     return messages, ToolCall(tool="get_account_summary", arguments={})
 
 
-@dataclass
-class Ledger:
-    balance_aud: float
-    transfers: list[ToolCall] = field(default_factory=list)
-    outbox: list[ToolCall] = field(default_factory=list)
-
-    def execute(self, call: ToolCall) -> None:
-        if call.tool == "transfer_funds":
-            amount = call.arguments.get("amount")
-            # bool is an int subclass; a True amount must not debit $1.
-            if isinstance(amount, bool) or not isinstance(amount, int | float):
-                raise ValueError("transfer_funds requires a numeric amount")
-            self.balance_aud -= amount
-            self.transfers.append(call)
-        elif call.tool == "send_email":
-            self.outbox.append(call)
+def _to_cents(amount: ArgumentValue) -> int:
+    # bool is an int subclass: True must not debit $1. The message never echoes the value (§2.2).
+    if isinstance(amount, bool) or not isinstance(amount, int | float) or amount <= 0:
+        raise ValueError("transfer_funds requires a positive amount in whole cents")
+    cents = Decimal(str(amount)) * 100
+    if cents != cents.to_integral_value():
+        raise ValueError("transfer_funds requires a positive amount in whole cents")
+    return int(cents)
 
 
-@dataclass(frozen=True)
-class DemoResult:
-    balance_before: float
-    balance_after: float
-    tool: str
-    verdict: Verdict | None
-    reasons: list[Reason]
+def execute(call: ToolCall, ledger: Ledger) -> Ledger:
+    """Apply a tool call to the ledger and return the new ledger. Unknown tools are no-ops."""
+    if call.tool == "transfer_funds":
+        return ledger.model_copy(
+            update={
+                "balance_cents": ledger.balance_cents - _to_cents(call.arguments.get("amount")),
+                "transfers": (*ledger.transfers, call),
+            }
+        )
+    if call.tool == "send_email":
+        return ledger.model_copy(update={"outbox": (*ledger.outbox, call)})
+    return ledger
 
 
 def run_demo(
@@ -102,14 +121,15 @@ def run_demo(
     user_request: str = DEFAULT_USER_REQUEST,
     inbox: list[str] | None = None,
     known_payees: list[str] | None = None,
-    opening_balance: float = 12_000,
+    opening_balance_cents: int = OPENING_BALANCE_CENTS,
 ) -> DemoResult:
     """Run one agent turn. Without a firewall the call executes; with one, only on ALLOW.
 
-    REQUIRE_HUMAN_APPROVAL parks the call: the approval workflow is out of scope.
+    REQUIRE_HUMAN_APPROVAL parks the call: the approval workflow is out of scope. A firewall
+    exception propagates, so nothing executes.
     """
     messages, call = propose_call(user_request, list(DEFAULT_INBOX) if inbox is None else inbox)
-    ledger = Ledger(balance_aud=opening_balance)
+    ledger = Ledger(balance_cents=opening_balance_cents)
     decision: Decision | None = None
     if firewall is not None:
         decision = firewall(
@@ -123,14 +143,20 @@ def run_demo(
             )
         )
     if decision is None or decision.verdict is Verdict.ALLOW:
-        ledger.execute(call)
+        ledger = execute(call, ledger)
     return DemoResult(
-        balance_before=opening_balance,
-        balance_after=ledger.balance_aud,
+        balance_before_cents=opening_balance_cents,
+        balance_after_cents=ledger.balance_cents,
         tool=call.tool,
         verdict=None if decision is None else decision.verdict,
         reasons=[] if decision is None else list(decision.reasons),
     )
+
+
+def _dollars(cents: int) -> str:
+    sign = "-" if cents < 0 else ""
+    whole, part = divmod(abs(cents), 100)
+    return f"{sign}${whole:,}.{part:02d}"
 
 
 def format_report(result: DemoResult) -> str:
@@ -141,12 +167,13 @@ def format_report(result: DemoResult) -> str:
         else f"firewall: {result.verdict.value} "
         f"({', '.join(r.value for r in result.reasons) or 'no reasons'})"
     )
-    moved = result.balance_before - result.balance_after
+    moved = result.balance_before_cents - result.balance_after_cents
     return "\n".join(
         [
             f"agent proposed: {result.tool}",
             firewall_line,
-            f"balance: ${result.balance_before:,.2f} -> ${result.balance_after:,.2f}",
-            f"money moved: ${moved:,.2f}" if moved else "money moved: none",
+            f"balance: {_dollars(result.balance_before_cents)} -> "
+            f"{_dollars(result.balance_after_cents)}",
+            f"money moved: {_dollars(moved)}" if moved else "money moved: none",
         ]
     )
