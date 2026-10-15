@@ -55,7 +55,8 @@ def _try_load(path: Path) -> Policy | str:
     if len(raw) > MAX_POLICY_BYTES:
         return "too large"
     try:
-        data = yaml.load(raw, Loader=_UniqueKeyLoader)  # noqa: S506 - SafeLoader subclass
+        # Safe: _UniqueKeyLoader is a SafeLoader subclass, which bandit cannot see through.
+        data = yaml.load(raw, Loader=_UniqueKeyLoader)  # noqa: S506  # nosec B506
     except (yaml.YAMLError, RecursionError):
         return "not valid YAML"
     if not isinstance(data, dict):

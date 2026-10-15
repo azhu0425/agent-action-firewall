@@ -21,16 +21,8 @@ jobs:
       - uses: astral-sh/setup-uv@v6
         with:
           python-version: "3.12"
-      # B506 is skipped because both yaml.load calls use _UniqueKeyLoader, a SafeLoader subclass
-      # that bandit cannot see through. The grep below keeps that exemption honest: any other
-      # yaml.load call fails the job.
-      - name: Bandit (static analysis of firewall/)
-        run: uvx bandit==1.9.4 -r firewall --skip B506
-      - name: Every yaml.load uses the safe unique-key loader
-        run: |
-          if grep -rn "yaml\.load(" firewall eval --include=*.py | grep -v "Loader=_UniqueKeyLoader"; then
-            echo "yaml.load without _UniqueKeyLoader"; exit 1
-          fi
+      - name: Bandit (static analysis of firewall/ and eval/)
+        run: uvx bandit==1.9.4 -r firewall eval
 
   pip-audit:
     runs-on: ubuntu-latest

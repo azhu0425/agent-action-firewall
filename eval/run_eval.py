@@ -134,7 +134,8 @@ def load_thresholds(path: Path) -> dict[str, object]:
     by check_gate."""
     try:
         # Duplicate keys rejected: a later `..._min: 0.0` must not silently win in review.
-        data = yaml.load(path.read_bytes(), Loader=UniqueKeyLoader)  # noqa: S506 - SafeLoader
+        # Safe: UniqueKeyLoader is a SafeLoader subclass, which bandit cannot see through.
+        data = yaml.load(path.read_bytes(), Loader=UniqueKeyLoader)  # noqa: S506  # nosec B506
     except yaml.YAMLError:
         data = None
     if not isinstance(data, dict):
