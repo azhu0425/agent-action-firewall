@@ -98,7 +98,7 @@ directly; its policy hash is on every audit record it wrote.
 1. **PR checks:** `verify` (lint, types, tests, coverage, eval gate, mutation), `security.yml`
    (bandit, pip-audit, gitleaks, container build and `/health` smoke), Codex and Claude review.
 2. **Approvals:** CODEOWNERS review for the policy, corpus, thresholds, CI and agent config; the
-   `main` ruleset requires a PR, a green `verify` and resolved threads, with merge commits only.
+   `main` ruleset requires a PR, a green `verify` and resolved threads, with squash merges only.
 3. **Deploy (not built):** build once on `main`, push the image by digest, deploy to staging in
    shadow mode, then to production in enforce mode behind a manual approval.
 4. **Rollback:** redeploy the previous digest, or revert the commit and let the pipeline ship it.
